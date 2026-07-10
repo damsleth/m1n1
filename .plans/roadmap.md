@@ -48,13 +48,15 @@ APSC (clusters → nominal pstate E5/P6), no more "unsupported". Detailed in
 | Works | Not yet |
 |---|---|
 | Raw boot to proxy, EL2, fb 3024×1964, AIC3, pmgr (485 dev), USB DARTs | Linux boot (Stage B–C incomplete) |
-| SMP: 14/14 cores, execute-and-return, MPIDR map | MCC (`mcc,t6041` unsupported — **next**) |
+| SMP: 14/14 cores, execute-and-return, MPIDR map | MCC init + SLC/plane RE done (t6041, Ph1+2); TZ offset + cache-enable open (Stage C) |
 | broken_wfi handled (wfe park) | cpufreq throttles (offsets unknown) |
 | cpufreq pstate/APSC (minimal) | PCIe/ATC, kboot FDT, cluster DVFS tables |
 | Local build + chainload dev loop | hv/XNU tracing (SPTM-blocked on M4) |
 
-Next target (boot-log gap #2): `MCC: Unsupported version:mcc,t6041` → Stage B
-item 2, detailed in `2026-07-10-t6040-mcc-plan.md`.
+Boot-log gap #2 (`MCC: Unsupported version:mcc,t6041`) — CLOSED (Phase 1,
+2026-07-10): `mcc_init_t6041()` added; MCC initializes ADT-only at boot. Remaining
+MCC work (plane count, SLC cache-enable) is Phase 2 / Stage C, in
+`2026-07-10-t6040-mcc-plan.md`.
 
 **Upstreaming pending** (drafts ready, awaiting review/post): SMP/broken_wfi/MPIDR
 findings + confirmed constants; cpufreq patch + throttle-offset question.
@@ -106,9 +108,13 @@ doable solo with the proxy + ADT dumps; this is the highest-leverage local work.
 1. ✅ **cpufreq** (`src/cpufreq.c`) — **DONE (minimal) 2026-07-10.** T6040 reuses
    `t6031_clusters`; pstate/APSC working. Throttle features deferred (t6030 offsets
    SError on T6040 P-clusters → need RE). See `2026-07-10-t6040-cpufreq-plan.md`.
-2. **MCC** (`src/mcc.c`) — **← NEXT.** ADT node is `mcc,t6041`; `mcc_init()` has no
-   branch for it (boot-log gap). `mcc_init_t6031` is ADT-driven → likely reuse.
-   Detailed in `2026-07-10-t6040-mcc-plan.md`. Needed for memory BW / DCP later.
+2. **MCC** (`src/mcc.c`) — **Phases 1+2 DONE (2026-07-10).** `mcc_init_t6041()`
+   added: t6031 reuse mis-parsed the ADT (AMCCs at `reg[12..15]` per `amcc-reg-idx`/
+   `amcc-count`, no `plane-count-per-amcc`). Phase 2 hardware-RE'd the SLC: 1 plane
+   per AMCC, status = 0x00010101 (T6031 decode wrong) — both encoded as `T6041_*`
+   constants. Boots clean, no MMIO at init. **Open (Stage C):** TZ/carveout offset
+   (t603x regs read 0 despite real carveouts) + the gated `mcc_enable_cache()`
+   write. Detailed in `2026-07-10-t6040-mcc-plan.md`. Needed for memory BW / DCP.
 3. **PCIe** (`src/pcie.c` + tunables) — `apcie` ADT bring-up for T6040. This is
    the WiFi/BT prerequisite: both sit on the Apple PCIe bus.
 4. **ATC/USB tunables + DART config** for the kernel handoff.
