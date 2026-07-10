@@ -32,8 +32,16 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   do NOT map to T6040 P-clusters — reads there raise SError.** They're dropped
   pending an RE'd T6040 register map. Boot path is `cpufreq_fixup()` (main.c),
   which no-ops for T6040; `cpufreq_init()` (payload/proxy op) does the real work.
-- **mcc.c — NEXT.** ADT is `mcc,t6041`; `mcc_init()` has no branch → "Unsupported".
-  `mcc_init_t6031` is ADT-only (no MMIO at init → low risk). See
+- **mcc.c — Phases 1+2 DONE (2026-07-10); TZ offset open (Stage C).** Added
+  `mcc_init_t6041()` (t6031 reuse does NOT work — reg map differs). ADT-driven:
+  `amcc-reg-idx=12`, `amcc-count=4` (**64-bit** prop → `u64`), 4× 32 MB AMCC windows
+  at `reg[12..15]`, `dcs-count-per-amcc=4`. Phase 2 hardware-verified: **1 plane per
+  AMCC** (`T6041_PLANE_COUNT=1` — plane-1 offset 0x40000 is unbacked, SError'd the
+  proxy), and SLC status = `0x00010101` (`T6041_CACHE_STATUS_MASK/VAL`; the T6031
+  12-way decode is wrong). Boots "4 instances, 1 planes, 4 channels", no MMIO at
+  init. **Open:** TZ/carveout offset (t603x regs read 0 despite real region-id-2/4
+  carveouts) — Stage-C-only, resolve via bounded value-search or macOS dump. Do NOT
+  blind-sweep MCC offsets (async SError → power-cycle). See
   `.plans/2026-07-10-t6040-mcc-plan.md`.
 - **chickens.c — leave M4 init fns NULL** (raw-boot locks Apple sysregs; writing
   traps). `features_m4` carries the local `broken_wfi=true`.
