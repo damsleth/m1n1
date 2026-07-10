@@ -73,6 +73,45 @@ necessary — without it m1n1 hangs hard in the PHY refclk poll, committed 8a547
 5. Raise on #asahi-dev — an L2C access-fault SError on M4 raw-kboot may be known
    (yuka's t8132/t6050 series).
 
+## UPDATE — past the m1n1 SError; now an early KERNEL hang (no console yet)
+
+Bisected the L2C SError to **`dapf_init_all`** (DART page-fault filter for
+aop/mtp): skipping it in `kboot_boot` clears the SError and m1n1 hands off cleanly
+(`Preparing to boot kernel`). So the kboot handoff now works. (mcc/usb confirmed
+NOT the cause; dapf skip + pcie defer are the two m1n1 diagnostics in place.)
+
+**Now: the kernel boots but shows nothing — only the m1n1 Asahi logo persists.**
+Two real issues found + one wall:
+1. **No framebuffer driver was built** — `defconfig` had `CONFIG_DRM=m`,
+   `DRM_SIMPLEDRM`/`FB_SIMPLE` unset → nothing binds the m1n1 fb → no on-screen
+   console at all, regardless of boot progress. FIXED: rebuilt with
+   `CONFIG_DRM=y` + `CONFIG_DRM_SIMPLEDRM=y` (+ FBDEV_EMULATION + FRAMEBUFFER_CONSOLE).
+2. **Kernel AIC trap risk patched** — `aic_init_cpu` writes the locked Apple EL2
+   sysreg `SYS_IMP_APL_VM_TMR_FIQ_ENA_EL2` (drivers/irqchip/irq-apple-aic.c:874);
+   on M4 raw-boot that traps. Commented it out (yuka-style). UNCONFIRMED whether it
+   was firing (no console to see).
+3. **WALL: still only the logo after the simpledrm rebuild** → the kernel hangs
+   *before* simpledrm binds (early arch/irq/timer/init), and there is **no
+   early-console path on M4 raw-boot over USB**: fb console needs simpledrm (mid-
+   boot, past the hang); …YG3 is m1n1's gadget UART (dies at handoff); m1n1 hv
+   console-relay is SPTM-blocked on M4. So early kernel output is invisible.
+
+### The unblock — #asahi-dev questions
+- **How do you get early kernel console on M4 (t8132/t6050) raw-boot via m1n1?**
+  (hardware debug UART on USB-C SBU? a specific `earlycon=`? an m1n1 flag/build?)
+  This is THE blocker for any further kernel-side progress.
+- Confirm: does t6040/M4 raw-boot trap `VM_TMR_FIQ_ENA_EL2` in `aic_init_cpu` (like
+  t6050), and how do you want it gated upstream (SoC quirk vs sysreg-locked check)?
+- Any other early locked-Apple-sysreg writes the kernel does on M4 that need
+  guarding before console comes up?
+- Does `dapf_init_all` L2C-fault on t6040 in m1n1 for you too, or is our carveout
+  handling (unmapped TZ, t603x regs read 0) the root cause?
+
+### Kernel-side changes in ~/code/linux (diagnostics, not committed by us)
+- `drivers/irqchip/irq-apple-aic.c`: VM_TMR_FIQ_ENA_EL2 write commented out.
+- `.config` (in the podman build tree): DRM/simpledrm built in.
+- m1n1 `src/kboot.c`: `dapf_init_all()` commented out (diagnostic — revert or gate).
+
 ## Console note
 The kernel's OWN console does NOT survive on the …YG3 USB UART (it's m1n1's gadget
 bridge, gone after handoff). But since we're blocked in m1n1 (pre-handoff, EL2),

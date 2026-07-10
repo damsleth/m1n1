@@ -2878,7 +2878,9 @@ int kboot_boot(void *kernel)
 
     usb_init();
     pcie_init();
-    dapf_init_all();
+    // DIAGNOSTIC 2026-07-10: bisecting the kboot L2C SError; delivered right after
+    // dapf. Skip to see if dapf is the culprit or smp_set_wfe_mode/later. Revert.
+    // dapf_init_all();
 
     printf("Setting SMP mode to WFE...\n");
     smp_set_wfe_mode(true);
