@@ -43,6 +43,31 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   carveouts) — Stage-C-only, resolve via bounded value-search or macOS dump. Do NOT
   blind-sweep MCC offsets (async SError → power-cycle). See
   `.plans/2026-07-10-t6040-mcc-plan.md`.
+- **pcie.c — Phase 1 DONE (2026-07-10).** Added `regs_t6040` + `apcie,t6040`
+  branch. ADT-verified (`/arm-io/apcie0`): 35 regs, #ports=4, shared=reg[0..6] then
+  4×7 port regs ⇒ `shared_reg_count=7` (only delta vs t6031; 8 fails the
+  even-divide check). Reuses t6031/T8122 path, num_phys=1. **`pcie_init` is
+  kboot-only + invasive — NEVER run it live on the M4; validate at Stage C, gated.**
+  Two new tunables (`apcie-cio3pllcore`, `apcie-pcieclkgen`, likely reg[5]/reg[6])
+  left unapplied on purpose (skipping is safe; guessing a target window = async
+  SError). See `.plans/2026-07-10-t6040-pcie-plan.md`.
+- **kboot_atc.c / ATC-USB-DART — AUDITED 2026-07-10 (item 4).** All kboot-only +
+  FDT-only (no MMIO). DART done (t6040 = `dart,t8110`, supported). ACIO USB4
+  rc/pcie_adapter tunable names present on `acio0` → work as-is. **ATC PHY tunables
+  blocked:** `atc-phy,t6040` has new source names (`CIO4PLL`, `AUS40CMN`,
+  `ATC_COMMON_CFG`, `LN{0,1}_RX_*`, …); FDT bucket names are stable but the
+  per-bucket reg_offset/size (t6040 PHY reg map) must be RE'd — don't invent, don't
+  add a `atc_tunables_t6040` guess. Fails gracefully to USB2-only, so it doesn't
+  block Stage C. See `.plans/2026-07-10-t6040-atc-usb-dart-plan.md`.
+- **kboot.c FDT (item 5) — AUDITED + display FIXED 2026-07-10.** kboot-only,
+  FDT-only (safe), needs a Stage-C kernel DT to run. `dt_set_display` now handles
+  t6040 (was "unknown compatible, skip"): reuses the t602x carveout scheme —
+  region-id 49/50/57/94/95/157 verified on the live `/chosen/carveout-memory-map`
+  (clustered around framebuffer region-id-14) — plus dcpext firmware. Generic parts
+  (spin-table/`dt_set_cpus`, DART t8110, ACIO) already work. **Don't** add a
+  speculative `dt_fixup_t6040_compat` — wait for a real t6040 DT. dcpext data
+  regions (73/74, 88/89) present but not statically carved (t602x pattern) —
+  validate at Stage C. See `.plans/2026-07-10-t6040-kboot-fdt-plan.md`.
 - **chickens.c — leave M4 init fns NULL** (raw-boot locks Apple sysregs; writing
   traps). `features_m4` carries the local `broken_wfi=true`.
 - **smp.c — `broken_wfi`** gates wfe-park vs `deep_wfi()`. Don't remove.
