@@ -447,6 +447,22 @@ static int pcie_init_controller(int controller, const char *path)
     }
 
     /*
+     * t6040 PHY bring-up is not yet implemented and HANGS the machine here
+     * (verified at Stage C boot 2026-07-10): the t6040 ATC/PCIe PHY needs the
+     * apcie-cio3pllcore-tunables / apcie-pcieclkgen-tunables (new on t6040, target
+     * reg window not yet RE'd) applied before the PHY reference-clock/CLK req-ack
+     * polls below will complete. Until that's RE'd, bail cleanly after the safe
+     * ADT/AXI2AF-tunable phase so kboot can proceed to the kernel. PCIe is not
+     * required for console boot (no pcie node in the minimal t6040 DT). See
+     * .plans/2026-07-10-t6040-pcie-plan.md.
+     */
+    if (state->pcie_regs == &regs_t6040) {
+        printf("pcie: t6040 PHY bring-up deferred (needs cio3pllcore/pcieclkgen "
+               "tunable RE); skipping\n");
+        return 0;
+    }
+
+    /*
      * Initialize PHY.
      */
 
