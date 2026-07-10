@@ -50,7 +50,7 @@ APSC (clusters → nominal pstate E5/P6), no more "unsupported". Detailed in
 | Raw boot to proxy, EL2, fb 3024×1964, AIC3, pmgr (485 dev), USB DARTs | Linux boot (Stage B–C incomplete) |
 | SMP: 14/14 cores, execute-and-return, MPIDR map | MCC init + SLC/plane RE done (t6041, Ph1+2); TZ offset + cache-enable open (Stage C) |
 | broken_wfi handled (wfe park) | cpufreq throttles (offsets unknown) |
-| cpufreq pstate/APSC (minimal) | PCIe/ATC, kboot FDT, cluster DVFS tables |
+| cpufreq pstate/APSC (minimal) | PCIe link-up (m1n1 t6040 branch in, Ph1; bring-up=Stage C), ATC, kboot FDT, DVFS tables |
 | Local build + chainload dev loop | hv/XNU tracing (SPTM-blocked on M4) |
 
 Boot-log gap #2 (`MCC: Unsupported version:mcc,t6041`) — CLOSED (Phase 1,
@@ -115,12 +115,34 @@ doable solo with the proxy + ADT dumps; this is the highest-leverage local work.
    constants. Boots clean, no MMIO at init. **Open (Stage C):** TZ/carveout offset
    (t603x regs read 0 despite real carveouts) + the gated `mcc_enable_cache()`
    write. Detailed in `2026-07-10-t6040-mcc-plan.md`. Needed for memory BW / DCP.
-3. **PCIe** (`src/pcie.c` + tunables) — `apcie` ADT bring-up for T6040. This is
-   the WiFi/BT prerequisite: both sit on the Apple PCIe bus.
-4. **ATC/USB tunables + DART config** for the kernel handoff.
-5. **kboot FDT init** (`src/kboot.c` and friends) — `apple,t6040` compatibles,
-   display reserved-regions handoff (framebuffer carveout), DCP node fixups, ISP
-   preallocation, GPU carveout, SEP/SMC nodes, spin-table/CPU-release method.
+3. **PCIe** (`src/pcie.c` + tunables) — **Phase 1 DONE (2026-07-10).** Added
+   `regs_t6040` + `apcie,t6040` dispatch branch. ADT-verified against live
+   `/arm-io/apcie0`: 35 regs, #ports=4, shared block = reg[0..6] then 4×7 port
+   regs ⇒ `shared_reg_count=7` (the one delta vs t6031; 8 would fail the
+   even-divide check). Reuses the t6031/T8122 init path. **NOT boot-testable**
+   (`pcie_init` is kboot-only + invasive → do NOT run live; validate at Stage C,
+   gated). **Open RE:** two new tunables (`apcie-cio3pllcore`, `apcie-pcieclkgen`,
+   likely reg[5]/reg[6]) left documented-but-unapplied (guessing a target = SError).
+   Detailed in `2026-07-10-t6040-pcie-plan.md`. WiFi/BT prerequisite.
+4. **ATC/USB tunables + DART config** — **AUDITED 2026-07-10 (mostly verify+defer).**
+   All kboot-only, FDT-only (safe). **DART = done** (t6040 DARTs are `dart,t8110`,
+   fully supported). **ACIO USB4 rc+pcie_adapter = works as-is** (prop names match).
+   **ATC PHY tunables = blocked** on the t6040 PHY reg-bucket offsets (FDT bucket
+   names are stable; only per-bucket reg_offset/size is the unknown — mustn't
+   invent). Graceful USB2-only fallback means this does NOT block Stage C; USB3/TB
+   is a Stage D comfort. NHI/apciec (Thunderbolt) name-mapping also deferred.
+   Watch `upstream/atcphy-new-tunables`. Detailed in
+   `2026-07-10-t6040-atc-usb-dart-plan.md`.
+5. **kboot FDT init** (`src/kboot.c` and friends) — **AUDITED + display FIXED
+   2026-07-10.** kboot-only, FDT-only (safe), Stage-C-coupled (patches a kernel DT
+   that doesn't exist yet). Generic parts already work for t6040: spin-table/
+   CPU-release (`dt_set_cpus`, SMP done), DART (t8110), ACIO. **Fixed:**
+   `dt_set_display` now has a t6040 branch — was hitting "unknown compatible, skip",
+   now reuses the t602x carveout scheme (region-id 49/50/57/94/95/157 verified on
+   the live carveout map) + dcpext firmware. **Deferred:** compat fixup (speculative
+   until a real t6040 DT exists), GPU carveout (Stage F), dcpext data-region
+   validation, ISP/SEP/SMC (verify at Stage C). Detailed in
+   `2026-07-10-t6040-kboot-fdt-plan.md`.
 6. **Python side** (`proxyclient/m1n1/`) — T6040 chip knowledge for the tools
    used to dump/verify all of the above.
 
