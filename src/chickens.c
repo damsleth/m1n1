@@ -113,6 +113,13 @@ const struct midr_part_features features_m4 = {
     .sleep_mode = SLEEP_NONE, // XXX probably new mode required
     .fast_ipi = true,
     .actlr_el2 = true,
+    /*
+     * On M4, wfi/wfit cause loss of architectural state on secondary
+     * cores (see the Linux t8132 DT series cover letter and the
+     * idle=nop kernel patches, 2026-07-05). Park secondaries in a
+     * wfe loop instead of deep_wfi().
+     */
+    .broken_wfi = true,
 };
 
 /*

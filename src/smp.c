@@ -231,6 +231,16 @@ void smp_start_secondaries(void)
 {
     printf("Starting secondary CPUs...\n");
 
+    /*
+     * On parts where wfi loses architectural state on secondary cores
+     * (M4 family), park secondaries in wfe from the very first start.
+     * No barriers needed here: no secondary is running yet.
+     */
+    if (cpu_features->broken_wfi && !wfe_mode) {
+        printf("smp: broken wfi on this SoC, parking secondaries in wfe\n");
+        wfe_mode = true;
+    }
+
     int pmgr_path[8];
 
     if (adt_path_offset_trace(adt, "/arm-io/pmgr", pmgr_path) < 0) {
@@ -485,6 +495,16 @@ u64 smp_wait(int cpu)
 
 void smp_set_wfe_mode(bool new_mode)
 {
+    /*
+     * Never fall back to deep_wfi() parking on parts with broken wfi:
+     * a secondary entering wfi may lose architectural state and never
+     * come back. Reachable via P_SMP_SET_WFE_MODE from the proxy.
+     */
+    if (cpu_features->broken_wfi && !new_mode) {
+        printf("smp: refusing to disable wfe mode, wfi is broken on this SoC\n");
+        return;
+    }
+
     wfe_mode = new_mode;
     sysop("dsb sy");
 
