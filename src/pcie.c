@@ -207,6 +207,33 @@ static const struct reg_info regs_t6031 = {
     .axi_idx = 4,
 };
 
+/*
+ * t6040 (M4 Pro) — identical to t6031 except shared_reg_count. Verified against
+ * the live /arm-io/apcie0 ADT (2026-07-10, see the PCIe plan): 35 reg entries,
+ * #ports=4, shared block = reg[0..6] (config/rc/phy_common/phy_ip/axi + 2 extra
+ * 0x415-block windows the base init doesn't use), then 4 ports × 7 regs. So
+ * shared_reg_count must be 7 (8 → 27 port regs, which fails the even-divide check
+ * at line ~386). type/compat left as t6031/T8122 so every existing t6031 code path
+ * fires identically to that validated template. NOT tested at boot — pcie_init is
+ * kboot-only; correctness here is ADT-derived + faithful t6031 reuse.
+ *
+ * Open RE (deferred to Stage C, see plan): t6040 also has two tunables no current
+ * code applies — apcie-cio3pllcore-tunables and apcie-pcieclkgen-tunables (likely
+ * targeting reg[5]/reg[6]). Left unapplied on purpose: skipping is safe, guessing
+ * a target window would async-SError at bring-up.
+ */
+static const struct reg_info regs_t6040 = {
+    .type = APCIE_T6031,
+    .compat = APCIE_T8122,
+    .shared_reg_count = 7,
+    .config_idx = 0,
+    .rc_idx = 1,
+    .phy_common_idx = 2,
+    .phy_idx = 2,
+    .phy_ip_idx = 3,
+    .axi_idx = 4,
+};
+
 static bool pcie_initialized = false;
 
 enum PCIE_CONTROLLERS {
@@ -283,6 +310,10 @@ static int pcie_init_controller(int controller, const char *path)
         fuse_bits = NULL;
         state->pcie_regs = &regs_t6031;
         printf("pcie: Initializing t6031 PCIe controller\n");
+    } else if (adt_is_compatible(adt, adt_offset, "apcie,t6040")) {
+        fuse_bits = NULL;
+        state->pcie_regs = &regs_t6040;
+        printf("pcie: Initializing t6040 PCIe controller\n");
     } else if (adt_is_compatible(adt, adt_offset, "apcie-ge,t6020")) {
         u32 lane_cfg;
         fuse_bits = NULL;

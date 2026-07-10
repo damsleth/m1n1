@@ -1981,7 +1981,17 @@ static int dt_set_display(void)
             }
         }
     } else if (!fdt_node_check_compatible(dt, 0, "apple,t6020") ||
-               !fdt_node_check_compatible(dt, 0, "apple,t6021")) {
+               !fdt_node_check_compatible(dt, 0, "apple,t6021") ||
+               !fdt_node_check_compatible(dt, 0, "apple,t6040")) {
+        /*
+         * t6040 (M4 Pro) reuses the t602x display carveout scheme. Verified on the
+         * live machine (2026-07-10): /chosen/carveout-memory-map has region-id
+         * 49/50/57/94/95/157 with display-plausible sizes clustered around the
+         * framebuffer (region-id-14), matching disp_reserved_regions_t602x exactly.
+         * dcpext data regions (73/74, 88/89 = dcpext0/1) are also present; the
+         * t602x path reserves dcpext *firmware* below but does not statically carve
+         * those data regions — validate at Stage C whether M4 DCP fw needs them.
+         */
         ret = dt_carveout_reserved_regions("dcp", "disp0", "disp0_piodma",
                                            disp_reserved_regions_t602x,
                                            ARRAY_SIZE(disp_reserved_regions_t602x));
@@ -2003,7 +2013,8 @@ static int dt_set_display(void)
     if (!fdt_node_check_compatible(dt, 0, "apple,t8112") ||
         !fdt_node_check_compatible(dt, 0, "apple,t6020") ||
         !fdt_node_check_compatible(dt, 0, "apple,t6021") ||
-        !fdt_node_check_compatible(dt, 0, "apple,t6022"))
+        !fdt_node_check_compatible(dt, 0, "apple,t6022") ||
+        !fdt_node_check_compatible(dt, 0, "apple,t6040"))
         dt_reserve_dcpext_firmware();
 
     const display_config_t *disp_cfg = display_get_config();
