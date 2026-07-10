@@ -153,10 +153,18 @@ early console. (Testable incrementally against Stage C.)
 
 *Target: linux-asahi boots to a shell on this machine. Weeks, parallel with B.*
 
-- **Device trees:** `arch/arm64/boot/dts/apple/t6040.dtsi` + `t6040-j614s.dts`,
-  templated from t6031 (M3 Pro/Max) and t602x. ADT quirk noted in session log
-  helps: arm-io is literally `t6041` compat, CPUs reuse M3 names — the SoC is a
-  Brava chop, so t6031 DTs are a close starting point.
+- **Device trees:** **DRAFT CREATED + dtc-valid 2026-07-10.** `t6040.dtsi` +
+  `t6040-j614s.dts` + generated `t6040-pmgr.dtsi` written in `~/code/linux`
+  (templated from t8132 (M4) IP + t6050 (Pro/Max) shape, not t6031 — yuka's minimal
+  M4/M5 DTs are the better base). All reg/irq values ADT-verified (14 cpus 4E+5P+5P,
+  AIC 0x5_02400000, UART irq 1559, WDT irq 827, pmgr×4, mem 0x100_00000000). Builds
+  to a 46 KB DTB. **Boot-tested 2026-07-10** (kernel built in a podman container —
+  native mac build impossible, case-insensitive FS): boots via m1n1 through the
+  whole `kboot_prepare_dt` + most of `kboot_boot`. Fixed a CPU-map gap bug (slot-9
+  placeholder). **Blocked** on an async L2C access-fault SError in the final kboot
+  steps (before the kernel jump) — Linux not started yet; carveout/SLC interaction
+  is the top suspect. Full analysis: `2026-07-10-t6040-stagec-boot-session.md`;
+  build env: memory `t6040-kernel-build-env`.
 - **AIC3:** boot log says AIC3 (vs AIC2 on M1/M2). Check the Asahi tree's M3-era
   `apple-aic` state; if AIC3 isn't there yet this is a real driver task, and it
   blocks *everything* (no interrupts, no boot).

@@ -1,5 +1,39 @@
 # t6040 device tree fill-in checklist
 
+## STATUS: draft CREATED + dtc-valid (2026-07-10)
+
+Files written in `~/code/linux/arch/arm64/boot/dts/apple/` (on branch
+`feature/m4-m5-minimal-device-trees` — the `t6040-minimal-device-trees` branch was
+never actually created; files are uncommitted there):
+- `t6040.dtsi` (SoC: 4E+5P+5P cpus, AIC, pmgr×4, wdt, serial0, timer, clkref)
+- `t6040-j614s.dts` (board: compatible/model, framebuffer, memory, serial enable)
+- `t6040-pmgr.dtsi` (214 power-controllers, generated from j614s.adt)
+- Makefile: `t6040-j614s.dtb` added.
+
+**Builds clean** via `clang -E … | dtc` → 46 KB DTB, 14 cpus + 214 pwrstates.
+(Kernel `make dtbs` needs GNU make ≥4.0 + cross-gcc, absent on this M1 host — used
+standalone dtc.) **All items 1–7 below RESOLVED with live-ADT values** (blob saved
+at `~/code/linux/j614s.adt`, 606 KB, iBoot per boot-log). Remaining: **item 8
+(boot test)** — needs a Linux build env + the actual boot attempt.
+
+Resolved values: AIC `0x5_02400000` (event +0x40000; NOT the old t6050 guess
+`0x2_80400000`), UART `0x4_29200000` IRQ **1559**, WDT `0x5_0836c000` IRQ **827**,
+mem base `0x100_00000000`, cpus 0x0-3 (E, l2 4M) / 0x10100-4 + 0x10200-4 (P, l2
+16M), pmgr ×4 (0x2_88e80000, 0x5_02280000, 0x5_02800000, 0x5_08300000).
+
+## Item 8 (boot test) — ATTEMPTED 2026-07-10, reached kboot handoff
+
+Kernel builds + boots via m1n1 through the ENTIRE `kboot_prepare_dt` and most of
+`kboot_boot`. Validated on HW: CPU-map (after the slot-9 `cpu@10105` placeholder
+fix), MCC SLC enable, PCIe t6040 parse (7 regs/port). **Blocked**: an imprecise
+async **L2C access-fault SError** (`L2C_ERR_STS 0x82`, `ADR 0x283640500578190`)
+in the final kboot steps (after `dapf`), before the kernel jump — Linux hasn't run
+yet. mcc/usb ruled out; carveout/SLC interaction is the top suspect. Full analysis
++ next steps: `2026-07-10-t6040-stagec-boot-session.md`. NO t6050-style
+VM_TMR_FIQ_ENA AIC crash (the risk item 8.3 flagged) — different failure.
+
+--- original checklist (proxy commands per item) below ---
+
 Draft DTs live in `~/code/linux` branch `t6040-minimal-device-trees`
 (`t6040.dtsi`, `t6040-j614s.dts`, on top of yuka's `feature/m4-m5-minimal-device-trees`).
 Every unverified value is tagged `TODO(adt)` — grep for it. This doc maps each
