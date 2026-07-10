@@ -196,10 +196,14 @@ TARGET_RAW := m1n1.bin
 
 DEPDIR := build/.deps
 
-.PHONY: all clean format invoke_cc always_rebuild
+.PHONY: all clean format invoke_cc always_rebuild proxy
 all: build/$(TARGET) build/$(TARGET_RAW)
 clean:
 	rm -rf build/* build/.deps
+# T6040 fork helper: connect to the tethered M4 proxy (see AGENTS.md).
+# Override the device with: make proxy M1N1DEVICE=/dev/cu.usbmodemXXX
+proxy:
+	@M1N1DEVICE="$(M1N1DEVICE)" ./scripts/m1n1-shell
 format:
 	$(CLANG_FORMAT) -i src/*.c src/dcp/*.c src/math/*.c src/*.h src/dcp/*.h src/math/*.h sysinc/*.h
 format-check:

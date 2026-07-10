@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+#
+# Connect to the tethered M4's m1n1 proxy with the right environment.
+# Usage:  ./scripts/m1n1-shell            (uses the default device below)
+#         M1N1DEVICE=/dev/cu.usbmodemXXX ./scripts/m1n1-shell
+#         make proxy
+#
+# Notes (see AGENTS.md):
+#  - python3 must be pyenv 3.10.7 (has pyserial+construct); the repo's
+#    .python-version pins it, so run from the repo root.
+#  - The LOWER-numbered usbmodem node is the proxy; the higher one is the 2nd UART.
+#  - USB gadget is NOT hot-plug safe. If the proxy wedges, power-cycle the M4.
+set -euo pipefail
+
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+: "${M1N1DEVICE:=/dev/cu.usbmodemJ22GYCN4YG1}"
+export M1N1DEVICE
+
+if [ ! -e "$M1N1DEVICE" ]; then
+  echo "m1n1-shell: $M1N1DEVICE not present." >&2
+  echo "  Is the M4 showing 'Running proxy...'? Power-cycle it if wedged." >&2
+  echo "  Or set M1N1DEVICE=/dev/cu.usbmodem... (lower-numbered node = proxy)." >&2
+  exit 1
+fi
+
+echo "m1n1-shell: connecting on $M1N1DEVICE (python: $(command -v python3))"
+cd "$REPO"
+exec python3 proxyclient/tools/shell.py "$@"
