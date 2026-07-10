@@ -1,0 +1,626 @@
+m1n1 base: 0x10004b08000
+Fetching ADT (0x00094000 bytes)...
+Total region size: 0x6c8000 bytes
+Loading kernel image (0x10c004 bytes)...
+.............................
+Copying SEPFW (0x574000 bytes)...
+Adjusting addresses in ADT...
+Pushing ADT (596296 bytes)...
+Setting up bootargs...
+Copying stub...
+Entry point: 0x10004b08800
+Reloading into stub at 0x10010164200
+TTY> Preparing to run next stage at 0x10010164200...
+Waiting for reconnection... ............................... Connected
+TTY> Initialized dockchannel UART at 0x508828000
+TTY> Device info:
+TTY>   Model: Mac16,8
+TTY>   Target: J614s
+TTY>   Board-ID: 0x4
+TTY>   Chip-ID: 0x6040
+TTY> 
+TTY> CPU init (MIDR: 0x611f0551 smp_id:0x4)...
+TTY>   CPU part: 0x55 rev: 0x11
+TTY>   CPU: M4 Pro Brava Chop (P core)
+TTY> 
+TTY> boot_args at 0x100051cc000
+TTY>   revision:     3
+TTY>   version:      2
+TTY>   virt_base:    0x52a8000
+TTY>   phys_base:    0x100032a8000
+TTY>   mem_size:     0x5cb500000
+TTY>   top_of_kdata: 0x100051d0000
+TTY>   video:
+TTY>     base:       0x105d2f90000
+TTY>     display:    0x1
+TTY>     stride:     0x2f40
+TTY>     width:      3024
+TTY>     height:     1964
+TTY>     depth:      30bpp
+TTY>     density:    1
+TTY>   machine_type: 0
+TTY>   devtree:      0x6a14000
+TTY>   devtree_size: 0x94000
+TTY>   cmdline:      
+TTY>   boot_flags:   0x0
+TTY>   mem_size_act: 0x600000000
+TTY> 
+TTY> 
+TTY> 
+TTY> m1n1 14d5173-dirty
+TTY> Copyright The Asahi Linux Contributors
+TTY> Licensed under the MIT license
+TTY> 
+TTY> Running in EL2
+TTY> 
+TTY> OS FW version: unknown (mBoot-18000.121.3)
+TTY> System FW version: unknown (mBoot-18000.121.3)
+TTY> Heap base: 0x100051d0000
+TTY> MCC: Unsupported version:mcc,t6041
+TTY> MMU: Initializing...
+TTY> MMU: RAM base: 0x10000000000
+TTY> MMU: Top of normal RAM: 0x105ce7a8000
+TTY> MMU: Adding Device-nGnRE mapping at 0xbc0000000 (0x20000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xb80000000 (0x40000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1cb0000000 (0x1c000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x800000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xa00000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c50000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xc00000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xe00000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c60000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1000000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1200000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c70000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1400000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1600000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c80000000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x105fff18000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffed8000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffeb8000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffe78000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffe58000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffe18000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x105fffb8000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x105fff70000 (0x4000)
+TTY> MMU: SCTLR_EL1: 30900180 -> 30901085
+TTY> MMU: running with MMU and caches enabled!
+TTY> AIC: Version 3 @ 0x502400000
+TTY> AIC: AIC3 with 1/2 dies, 2720/4096 IRQs, reg_size:40004, config:10000, extintrcfg_stride:04a00, intmaskset_stride:04a00, intmaskclear_stride:04a00
+TTY> AIC: Configuring 1 external interrupts
+TTY> Primary WDT register @ 0x50836c000
+TTY> Primary WDT disabled
+TTY> Secondary WDT register @ 0x508330008
+TTY> Secondary WDT disabled
+TTY> pmgr: Cleaning up device states...
+TTY> pmgr: initialized, 485 devices on 1 dies found.
+TTY> display: Display is internal
+TTY> display: Display is already initialized (3024x1964)
+TTY> fb init: 3024x1964 (30) [s=3024] @0x105d2f90000
+TTY> fb console: max rows 57, max cols 78
+TTY> fb: display logo
+TTY> cpufreq: Chip 0x6040 is unsupported
+TTY> Initialization complete.
+TTY> Checking for payloads...
+TTY> Devicetree compatible value: apple,j614s
+TTY> No more payloads at 0x10004c14000
+TTY> No valid payload found
+TTY> dart: dart /arm-io/dart-usb0 at 0x382f80000 is a t8110
+TTY> USB0: initialized at 0x100051d4090
+TTY> dart: dart /arm-io/dart-usb1 at 0x38af80000 is a t8110
+TTY> USB1: initialized at 0x100051d4560
+TTY> dart: dart /arm-io/dart-usb2 at 0x392f80000 is a t8110
+TTY> USB2: initialized at 0x100051d4a60
+TTY> Running proxy...
+Proxy is alive again
+m1n1 base: 0x10004b08000
+Fetching ADT (0x00094000 bytes)...
+CHIPID=0x6040 broken_wfi=True base=0x10004b08000
+TEXT MATCH @[0x1000..0x9000] running-image vs build/m1n1.bin: False
+  first diff at file 0x4f90: mem=44 bin=00
+m1n1 base: 0x10004b08000
+Fetching ADT (0x00094000 bytes)...
+=== A. probe candidate CLUSTER_PSTATE regs (base+0x20020), guarded ===
+ECPU0 @0x210e00000: PSTATE=0x0000000000400101  BUSY=0 SET=0 APSC_BUSY=0 DESIRED1=1 DESIRED2=0
+PCPU0 @0x211e00000: PSTATE=0x0000000000400101  BUSY=0 SET=0 APSC_BUSY=0 DESIRED1=1 DESIRED2=0
+PCPU1 @0x212e00000: PSTATE=0x0000000000400101  BUSY=0 SET=0 APSC_BUSY=0 DESIRED1=1 DESIRED2=0
+=== B. ADT nodes with reg base in [0x210000000, 0x213000000] ===
+  /device-tree/arm-io: reg addr=0x210f00000
+  /device-tree/arm-io: reg addr=0x211f00000
+  /device-tree/arm-io: reg addr=0x212f00000
+  /device-tree/arm-io/apcie0: reg addr=0x210028000
+  /device-tree/arm-io/apcie0: reg addr=0x21003c000
+  /device-tree/arm-io/apcie0: reg addr=0x210024000
+  /device-tree/arm-io/apcie0: reg addr=0x210048000
+  /device-tree/arm-io/apcie0: reg addr=0x210044000
+  /device-tree/arm-io/apcie0: reg addr=0x211028000
+  /device-tree/arm-io/apcie0: reg addr=0x21103c000
+  /device-tree/arm-io/apcie0: reg addr=0x211024000
+  /device-tree/arm-io/apcie0: reg addr=0x211048000
+  /device-tree/arm-io/apcie0: reg addr=0x211044000
+  /device-tree/arm-io/apcie0: reg addr=0x212028000
+  /device-tree/arm-io/apcie0: reg addr=0x21203c000
+  /device-tree/arm-io/apcie0: reg addr=0x212024000
+  /device-tree/arm-io/apcie0: reg addr=0x212048000
+  /device-tree/arm-io/apcie0: reg addr=0x212044000
+  /device-tree/arm-io/dart-apcie0: reg addr=0x210000000
+  /device-tree/arm-io/apcie0-piodma: reg addr=0x210030000
+  /device-tree/arm-io/apcie0-piodma: reg addr=0x210034000
+  /device-tree/arm-io/apcie0-piodma: reg addr=0x210038000
+  /device-tree/arm-io/dart-apcie1: reg addr=0x211000000
+  /device-tree/arm-io/apcie1-piodma: reg addr=0x211030000
+  /device-tree/arm-io/apcie1-piodma: reg addr=0x211034000
+  /device-tree/arm-io/apcie1-piodma: reg addr=0x211038000
+=== C. /cpus cluster layout ===
+  cpu0: cluster-id=0 type=E impl_reg=ListContainer: 
+    0x0000000210050000
+    0x0000000000009010
+  cpu1: cluster-id=0 type=E impl_reg=ListContainer: 
+    0x0000000210150000
+    0x0000000000009010
+  cpu2: cluster-id=0 type=E impl_reg=ListContainer: 
+    0x0000000210250000
+    0x0000000000009010
+  cpu3: cluster-id=0 type=E impl_reg=ListContainer: 
+    0x0000000210350000
+    0x0000000000009010
+  cpu4: cluster-id=1 type=P impl_reg=ListContainer: 
+    0x0000000211050000
+    0x0000000000009010
+  cpu5: cluster-id=1 type=P impl_reg=ListContainer: 
+    0x0000000211150000
+    0x0000000000009010
+  cpu6: cluster-id=1 type=P impl_reg=ListContainer: 
+    0x0000000211250000
+    0x0000000000009010
+  cpu7: cluster-id=1 type=P impl_reg=ListContainer: 
+    0x0000000211350000
+    0x0000000000009010
+  cpu8: cluster-id=1 type=P impl_reg=ListContainer: 
+    0x0000000211450000
+    0x0000000000009010
+  cpu10: cluster-id=2 type=P impl_reg=ListContainer: 
+    0x0000000212050000
+    0x0000000000009010
+  cpu11: cluster-id=2 type=P impl_reg=ListContainer: 
+    0x0000000212150000
+    0x0000000000009010
+  cpu12: cluster-id=2 type=P impl_reg=ListContainer: 
+    0x0000000212250000
+    0x0000000000009010
+  cpu13: cluster-id=2 type=P impl_reg=ListContainer: 
+    0x0000000212350000
+    0x0000000000009010
+  cpu14: cluster-id=2 type=P impl_reg=ListContainer: 
+    0x0000000212450000
+    0x0000000000009010
+m1n1 base: 0x10004b08000
+Fetching ADT (0x00094000 bytes)...
+=== BEFORE: cluster register values ===
+  ECPU0 0x210e20020 (+0x20020) = 0x0000000000400101
+  ECPU0 0x210e40250 (+0x40250) = FAULT
+  ECPU0 0x210e40270 (+0x40270) = 0x0000000000000000
+  ECPU0 0x210e48400 (+0x48400) = 0x0000000000000000
+  ECPU0 0x210e48408 (+0x48408) = 0x0000000000000000
+  ECPU0 0x210e440f8 (+0x440f8) = 0x0000000000000000
+  PCPU0 0x211e20020 (+0x20020) = 0x0000000000400101
+TTY> Exception: SError
+Traceback (most recent call last):
+  File "/Users/damsleth/.pyenv/versions/3.10.7/lib/python3.10/site-packages/serial/serialposix.py", line 575, in read
+    buf = os.read(self.fd, size - len(read))
+OSError: [Errno 6] Device not configured
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/private/tmp/claude-501/-Users-damsleth-Code-m1n1/63c638db-8d3f-4779-9ce8-0e9cb54b7bbe/scratchpad/snap.py", line 21, in <module>
+    v, fault = gread64(a)
+  File "/private/tmp/claude-501/-Users-damsleth-Code-m1n1/63c638db-8d3f-4779-9ce8-0e9cb54b7bbe/scratchpad/snap.py", line 10, in gread64
+    v = p.read64(addr)
+  File "/Users/damsleth/Code/m1n1/proxyclient/m1n1/proxy.py", line 847, in read64
+    return self.request(self.P_READ64, addr)
+  File "/Users/damsleth/Code/m1n1/proxyclient/m1n1/proxy.py", line 737, in request
+    return self._request(opcode, *args2, **kwargs)
+  File "/Users/damsleth/Code/m1n1/proxyclient/m1n1/proxy.py", line 701, in _request
+    reply = self.iface.proxyreq(req, reboot=reboot, no_reply=no_reply, pre_reply=None)
+  File "/Users/damsleth/Code/m1n1/proxyclient/m1n1/proxy.py", line 388, in proxyreq
+    return self.reply(self.REQ_PROXY)
+  File "/Users/damsleth/Code/m1n1/proxyclient/m1n1/proxy.py", line 259, in reply
+    reply += self.readfull(1)
+  File "/Users/damsleth/Code/m1n1/proxyclient/m1n1/proxy.py", line 196, in readfull
+    block = self.dev.read(size - len(d))
+  File "/Users/damsleth/.pyenv/versions/3.10.7/lib/python3.10/site-packages/serial/serialposix.py", line 581, in read
+    raise SerialException('read failed: {}'.format(e))
+serial.serialutil.SerialException: read failed: [Errno 6] Device not configured
+TTY> Initialized dockchannel UART at 0x508828000
+TTY> Device info:
+TTY>   Model: Mac16,8
+TTY>   Target: J614s
+TTY>   Board-ID: 0x4
+TTY>   Chip-ID: 0x6040
+TTY> 
+TTY> CPU init (MIDR: 0x611f0551 smp_id:0x4)...
+TTY>   CPU part: 0x55 rev: 0x11
+TTY>   CPU: M4 Pro Brava Chop (P core)
+TTY> 
+TTY> boot_args at 0x10006558000
+TTY>   revision:     3
+TTY>   version:      2
+TTY>   virt_base:    0xf2a8000
+TTY>   phys_base:    0x100032a8000
+TTY>   mem_size:     0x5cb500000
+TTY>   top_of_kdata: 0x10006568000
+TTY>   video:
+TTY>     base:       0x105d2f90000
+TTY>     display:    0x1
+TTY>     stride:     0x2f40
+TTY>     width:      3024
+TTY>     height:     1964
+TTY>     depth:      30bpp
+TTY>     density:    1
+TTY>   machine_type: 0
+TTY>   devtree:      0x11cf8000
+TTY>   devtree_size: 0x94000
+TTY>   cmdline:      
+TTY>   boot_flags:   0x0
+TTY>   mem_size_act: 0x600000000
+TTY> 
+TTY> 
+TTY> 
+TTY> m1n1 v1.6.0-27-g14d5173
+TTY> Copyright The Asahi Linux Contributors
+TTY> Licensed under the MIT license
+TTY> 
+TTY> Running in EL2
+TTY> 
+TTY> OS FW version: unknown (mBoot-18000.121.3)
+TTY> System FW version: unknown (mBoot-18000.121.3)
+TTY> Heap base: 0x10006568000
+TTY> MCC: Unsupported version:mcc,t6041
+TTY> MMU: Initializing...
+TTY> MMU: RAM base: 0x10000000000
+TTY> MMU: Top of normal RAM: 0x105ce7a8000
+TTY> MMU: Adding Device-nGnRE mapping at 0xbc0000000 (0x20000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xb80000000 (0x40000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1cb0000000 (0x1c000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x800000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xa00000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c50000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xc00000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xe00000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c60000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1000000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1200000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c70000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1400000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1600000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c80000000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x105fff18000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffed8000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffeb8000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffe78000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffe58000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffe18000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x105fffb8000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x105fff70000 (0x4000)
+TTY> MMU: SCTLR_EL1: 30000180 -> 30901085
+TTY> MMU: running with MMU and caches enabled!
+TTY> AIC: Version 3 @ 0x502400000
+TTY> AIC: AIC3 with 1/2 dies, 2720/4096 IRQs, reg_size:40004, config:10000, extintrcfg_stride:04a00, intmaskset_stride:04a00, intmaskclear_stride:04a00
+TTY> AIC: Configuring 1 external interrupts
+TTY> Primary WDT register @ 0x50836c000
+TTY> Primary WDT disabled
+TTY> Secondary WDT register @ 0x508330008
+TTY> Secondary WDT disabled
+TTY> pmgr: Cleaning up device states...
+TTY> pmgr: Enabling 0.ATC0_COMMON, parent of active device ATC0_USB
+TTY> pmgr: Enabling 0.ATC1_COMMON, parent of active device ATC1_USB
+TTY> pmgr: Enabling 0.ATC2_COMMON, parent of active device ATC2_USB
+TTY> pmgr: Enabling 0.ATC3_COMMON, parent of active device ATC3_USB
+TTY> pmgr: initialized, 485 devices on 1 dies found.
+TTY> display: Display is internal
+TTY> display: Display is already initialized (3024x1964)
+TTY> fb init: 3024x1964 (30) [s=3024] @0x105d2f90000
+TTY> fb console: max rows 57, max cols 78
+TTY> fb: display logo
+TTY> cpufreq: Chip 0x6040 is unsupported
+TTY> Initialization complete.
+TTY> Checking for payloads...
+TTY> Devicetree compatible value: apple,j614s
+TTY> Unknown payload at 0x10005ef8000 (magic: 5b41464b)
+TTY> No valid payload found
+TTY> dart: dart /arm-io/dart-usb0 at 0x382f80000 is a t8110
+TTY> USB0: initialized at 0x1000656c090
+TTY> dart: dart /arm-io/dart-usb1 at 0x38af80000 is a t8110
+TTY> USB1: initialized at 0x1000656c560
+TTY> dart: dart /arm-io/dart-usb2 at 0x392f80000 is a t8110
+TTY> USB2: initialized at 0x1000656ca60
+TTY> Running proxy...
+m1n1 base: 0x10005dec000
+Fetching ADT (0x00094000 bytes)...
+CHIPID=0x6040 broken_wfi=True fast_ipi=True actlr_el2=True apple_sysregs_unlocked=False
+m1n1 base: 0x10005dec000
+Fetching ADT (0x00094000 bytes)...
+=== /arm-io/pmgr feature properties (T6040 ADT) ===
+  cpu-apsc                     PRESENT  value=1
+  ppt-thrtl                    PRESENT  value=1
+  llc-thrtl                    PRESENT  value=1
+  amx-thrtl                    PRESENT  value=1
+  cpu-fixed-freq-pll-relock    PRESENT  value=0
+=== all /arm-io/pmgr property names ===
+  AAPL,phandle, acc-cluster-power-gating, acc-harvesting, aes-domain-hack, afr-tvm, amx-thrtl, ap-voter-agent-idx, ap-wake-sources, apsc-snooze, axi2af-hack, boost-agent, boost-performance1, bridge-reg-index, bwr-agent, check-energy-ver, check-ps-b4-sleep, clpc, clpc-voter-agent-idx, cluster-agent, cluster-ctl-offset, clusters, compatible, cpu-apsc, cpu-fixed-freq-pll-relock, cpu-power-gate-latency-us, cpu-tvm, dcs-tvm, device-check-ps-b4-sleep, device_type, devices, disp-tvm, disp2-tvm, dvmr-agent, edt-property-ver, energy-counters, frc-cpm-on-hack, free-running-counter, function-toggle_vdd_cio, gfx-tvm, hw-dpe-reg, interrupt-config, interrupt-parent, interrupts, llc-thrtl, mcx-fast-pcpu-frequency, misc-acg-offset, misc-cores-offset, mtr-polynom-fuse-agx, name, noise-hack, nominal-performance1, panic-debug-switch-pg-wa, panic-nub-pg-wa, perf-counters, perf-domains, perf-groups, pmc, pmc-ltr-ka, pmc-pmgr, pmgr-dock-fifo-agent, pmgr-dock-fifo-channel, pmp, pmp-voter-agent-idx, ppt-thrtl, ps-groups, ptd-dvfs-ceil-range, ptd-ranges, pwrgateretention-workaround, reg, rosc-apply, snooze-counter, soc-cluster-power-gating, soc-clusters, soc-dpe, soc-tvm, total-rails-leakage, vdd-cio-rail-pg, volman-sw-err-check, voltage-states0, voltage-states1, voltage-states1-sram, voltage-states11, voltage-states13, voltage-states13-sram, voltage-states14, voltage-states14-sram, voltage-states2, voltage-states28, voltage-states29, voltage-states30, voltage-states31, voltage-states5, voltage-states5-sram, voltage-states8, voltage-states9, voltage-states9-sram, voter-agent, voter-rail-data, wake-time-events
+m1n1 base: 0x10005dec000
+Fetching ADT (0x00094000 bytes)...
+  cluster-ctl-offset     = 131072
+  misc-acg-offset        = 622592
+  misc-cores-offset      = 557056
+  hw-dpe-reg             = 'bytes:0810d1880200000080010000c0e10300820101000100014047505500000000000000000000000000090000003201000080010000000000008201010101010040475055205352414d0000000000000000c07900880200000080010000c8c40000820101000000014041465200000000000000000000000000e080978504000000093d0000b8650000fa00010000000140414e45000000000000000000000000000002200005000000fa000000a50600001a00010001010140495350000000000000000000000000000802200005000000fa000000c80f00001a00010001010140415645000000000000000000000000001002200005000000fa000000d01700001a000100010101404d535200000000000000000000000000083f200005000000fa0000006d4601001a00010001010140414d43430000000000000000000000000843200005000000fa0000000c4900001a00010001010140444353000000000000000000000000000847200005000000fa000000b3a700001a000100010101404452414d000000000000000000000000084b200005000000fa000000b80b00001a00010001010140444953500000000000000000000000001802200005000000fa000000e83500001a0001000101014044495350455854000000000000000000'
+  apsc-snooze            = 0
+  cpu-apsc               = 1
+  ppt-thrtl              = 1
+  llc-thrtl              = 1
+  amx-thrtl              = 1
+  cpu-fixed-freq-pll-relock = 0
+m1n1 base: 0x10005dec000
+Fetching ADT (0x00094000 bytes)...
+=== P-cluster confirm-read (amx-thrtl 0x40250 intentionally skipped) ===
+  PCPU0 0x211e20020 (+0x20020) = 0x0000000000400101
+TTY> Exception: SError
+Traceback (most recent call last):
+  File "/private/tmp/claude-501/-Users-damsleth-Code-m1n1/63c638db-8d3f-4779-9ce8-0e9cb54b7bbe/scratchpad/pconfirm.py", line 20, in <module>
+    v, fault = gread64(a)
+  File "/private/tmp/claude-501/-Users-damsleth-Code-m1n1/63c638db-8d3f-4779-9ce8-0e9cb54b7bbe/scratchpad/pconfirm.py", line 11, in gread64
+    v = p.read64(addr)
+  File "/Users/damsleth/Code/m1n1/proxyclient/m1n1/proxy.py", line 847, in read64
+    return self.request(self.P_READ64, addr)
+  File "/Users/damsleth/Code/m1n1/proxyclient/m1n1/proxy.py", line 737, in request
+    return self._request(opcode, *args2, **kwargs)
+  File "/Users/damsleth/Code/m1n1/proxyclient/m1n1/proxy.py", line 701, in _request
+    reply = self.iface.proxyreq(req, reboot=reboot, no_reply=no_reply, pre_reply=None)
+  File "/Users/damsleth/Code/m1n1/proxyclient/m1n1/proxy.py", line 388, in proxyreq
+    return self.reply(self.REQ_PROXY)
+  File "/Users/damsleth/Code/m1n1/proxyclient/m1n1/proxy.py", line 259, in reply
+    reply += self.readfull(1)
+  File "/Users/damsleth/Code/m1n1/proxyclient/m1n1/proxy.py", line 198, in readfull
+    raise UartTimeout("Expected %d bytes, got %d bytes"%(size,len(d)))
+m1n1.proxy.UartTimeout: Expected 1 bytes, got 0 bytes
+TTY> Initialized dockchannel UART at 0x508828000
+TTY> Device info:
+TTY>   Model: Mac16,8
+TTY>   Target: J614s
+TTY>   Board-ID: 0x4
+TTY>   Chip-ID: 0x6040
+TTY> 
+TTY> CPU init (MIDR: 0x611f0551 smp_id:0x4)...
+TTY>   CPU part: 0x55 rev: 0x11
+TTY>   CPU: M4 Pro Brava Chop (P core)
+TTY> 
+TTY> boot_args at 0x100065f4000
+TTY>   revision:     3
+TTY>   version:      2
+TTY>   virt_base:    0x92a8000
+TTY>   phys_base:    0x100032a8000
+TTY>   mem_size:     0x5cb500000
+TTY>   top_of_kdata: 0x10006604000
+TTY>   video:
+TTY>     base:       0x105d2f90000
+TTY>     display:    0x1
+TTY>     stride:     0x2f40
+TTY>     width:      3024
+TTY>     height:     1964
+TTY>     depth:      30bpp
+TTY>     density:    1
+TTY>   machine_type: 0
+TTY>   devtree:      0xbd94000
+TTY>   devtree_size: 0x94000
+TTY>   cmdline:      
+TTY>   boot_flags:   0x0
+TTY>   mem_size_act: 0x600000000
+TTY> 
+TTY> 
+TTY> 
+TTY> m1n1 v1.6.0-27-g14d5173
+TTY> Copyright The Asahi Linux Contributors
+TTY> Licensed under the MIT license
+TTY> 
+TTY> Running in EL2
+TTY> 
+TTY> OS FW version: unknown (mBoot-18000.121.3)
+TTY> System FW version: unknown (mBoot-18000.121.3)
+TTY> Heap base: 0x10006604000
+TTY> MCC: Unsupported version:mcc,t6041
+TTY> MMU: Initializing...
+TTY> MMU: RAM base: 0x10000000000
+TTY> MMU: Top of normal RAM: 0x105ce7a8000
+TTY> MMU: Adding Device-nGnRE mapping at 0xbc0000000 (0x20000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xb80000000 (0x40000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1cb0000000 (0x1c000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x800000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xa00000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c50000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xc00000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xe00000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c60000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1000000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1200000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c70000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1400000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1600000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c80000000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x105fff18000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffed8000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffeb8000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffe78000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffe58000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffe18000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x105fffb8000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x105fff70000 (0x4000)
+TTY> MMU: SCTLR_EL1: 30000180 -> 30901085
+TTY> MMU: running with MMU and caches enabled!
+TTY> AIC: Version 3 @ 0x502400000
+TTY> AIC: AIC3 with 1/2 dies, 2720/4096 IRQs, reg_size:40004, config:10000, extintrcfg_stride:04a00, intmaskset_stride:04a00, intmaskclear_stride:04a00
+TTY> AIC: Configuring 1 external interrupts
+TTY> Primary WDT register @ 0x50836c000
+TTY> Primary WDT disabled
+TTY> Secondary WDT register @ 0x508330008
+TTY> Secondary WDT disabled
+TTY> pmgr: Cleaning up device states...
+TTY> pmgr: Enabling 0.ATC0_COMMON, parent of active device ATC0_USB
+TTY> pmgr: Enabling 0.ATC1_COMMON, parent of active device ATC1_USB
+TTY> pmgr: Enabling 0.ATC2_COMMON, parent of active device ATC2_USB
+TTY> pmgr: Enabling 0.ATC3_COMMON, parent of active device ATC3_USB
+TTY> pmgr: initialized, 485 devices on 1 dies found.
+TTY> display: Display is internal
+TTY> display: Display is already initialized (3024x1964)
+TTY> fb init: 3024x1964 (30) [s=3024] @0x105d2f90000
+TTY> fb console: max rows 57, max cols 78
+TTY> fb: display logo
+TTY> cpufreq: Chip 0x6040 is unsupported
+TTY> Initialization complete.
+TTY> Checking for payloads...
+TTY> Devicetree compatible value: apple,j614s
+TTY> Unknown payload at 0x10005f94000 (magic: 5b41464b)
+TTY> No valid payload found
+TTY> dart: dart /arm-io/dart-usb0 at 0x382f80000 is a t8110
+TTY> USB0: initialized at 0x10006608090
+TTY> dart: dart /arm-io/dart-usb1 at 0x38af80000 is a t8110
+TTY> USB1: initialized at 0x10006608560
+TTY> dart: dart /arm-io/dart-usb2 at 0x392f80000 is a t8110
+TTY> USB2: initialized at 0x10006608a60
+TTY> Running proxy...
+m1n1 base: 0x10005e88000
+Fetching ADT (0x00094000 bytes)...
+CHIPID=0x6040 base=0x10005e88000
+=== BEFORE: CLUSTER_PSTATE (base+0x20020) ===
+  ECPU0 0x210e20020 = 0x0000000000400101  DESIRED1=1 SET=0 BUSY=0
+  PCPU0 0x211e20020 = 0x0000000000400101  DESIRED1=1 SET=0 BUSY=0
+  PCPU1 0x212e20020 = 0x0000000000400101  DESIRED1=1 SET=0 BUSY=0
+m1n1 base: 0x10005e88000
+Fetching ADT (0x00094000 bytes)...
+Total region size: 0x6c8000 bytes
+Loading kernel image (0x10c004 bytes)...
+.............................
+Copying SEPFW (0x574000 bytes)...
+Adjusting addresses in ADT...
+Pushing ADT (596296 bytes)...
+Setting up bootargs...
+Copying stub...
+Entry point: 0x10005e88800
+Reloading into stub at 0x100113e0200
+TTY> Preparing to run next stage at 0x100113e0200...
+Waiting for reconnection... .............................. Connected
+TTY> Initialized dockchannel UART at 0x508828000
+TTY> Device info:
+TTY>   Model: Mac16,8
+TTY>   Target: J614s
+TTY>   Board-ID: 0x4
+TTY>   Chip-ID: 0x6040
+TTY> 
+TTY> CPU init (MIDR: 0x611f0551 smp_id:0x4)...
+TTY>   CPU part: 0x55 rev: 0x11
+TTY>   CPU: M4 Pro Brava Chop (P core)
+TTY> 
+TTY> boot_args at 0x1000654c000
+TTY>   revision:     3
+TTY>   version:      2
+TTY>   virt_base:    0x92a8000
+TTY>   phys_base:    0x100032a8000
+TTY>   mem_size:     0x5cb500000
+TTY>   top_of_kdata: 0x10006550000
+TTY>   video:
+TTY>     base:       0x105d2f90000
+TTY>     display:    0x1
+TTY>     stride:     0x2f40
+TTY>     width:      3024
+TTY>     height:     1964
+TTY>     depth:      30bpp
+TTY>     density:    1
+TTY>   machine_type: 0
+TTY>   devtree:      0xbd94000
+TTY>   devtree_size: 0x94000
+TTY>   cmdline:      
+TTY>   boot_flags:   0x0
+TTY>   mem_size_act: 0x600000000
+TTY> 
+TTY> 
+TTY> 
+TTY> m1n1 14d5173-dirty
+TTY> Copyright The Asahi Linux Contributors
+TTY> Licensed under the MIT license
+TTY> 
+TTY> Running in EL2
+TTY> 
+TTY> OS FW version: unknown (mBoot-18000.121.3)
+TTY> System FW version: unknown (mBoot-18000.121.3)
+TTY> Heap base: 0x10006550000
+TTY> MCC: Unsupported version:mcc,t6041
+TTY> MMU: Initializing...
+TTY> MMU: RAM base: 0x10000000000
+TTY> MMU: Top of normal RAM: 0x105ce7a8000
+TTY> MMU: Adding Device-nGnRE mapping at 0xbc0000000 (0x20000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xb80000000 (0x40000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1cb0000000 (0x1c000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x800000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xa00000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c50000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xc00000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0xe00000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c60000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1000000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1200000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c70000000 (0x4000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1400000000 (0x200000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1600000000 (0x80000000)
+TTY> MMU: Adding Device-nGnRE mapping at 0x1c80000000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x105fff18000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffed8000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffeb8000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffe78000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffe58000 (0x20000)
+TTY> MMU: Adding Normal-NC mapping at 0x105ffe18000 (0x10000)
+TTY> MMU: Adding Normal-NC mapping at 0x105fffb8000 (0x4000)
+TTY> MMU: Adding Normal-NC mapping at 0x105fff70000 (0x4000)
+TTY> MMU: SCTLR_EL1: 30900180 -> 30901085
+TTY> MMU: running with MMU and caches enabled!
+TTY> AIC: Version 3 @ 0x502400000
+TTY> AIC: AIC3 with 1/2 dies, 2720/4096 IRQs, reg_size:40004, config:10000, extintrcfg_stride:04a00, intmaskset_stride:04a00, intmaskclear_stride:04a00
+TTY> AIC: Configuring 1 external interrupts
+TTY> Primary WDT register @ 0x50836c000
+TTY> Primary WDT disabled
+TTY> Secondary WDT register @ 0x508330008
+TTY> Secondary WDT disabled
+TTY> pmgr: Cleaning up device states...
+TTY> pmgr: initialized, 485 devices on 1 dies found.
+TTY> display: Display is internal
+TTY> display: Display is already initialized (3024x1964)
+TTY> fb init: 3024x1964 (30) [s=3024] @0x105d2f90000
+TTY> fb console: max rows 57, max cols 78
+TTY> fb: display logo
+TTY> Initialization complete.
+TTY> Checking for payloads...
+TTY> Devicetree compatible value: apple,j614s
+TTY> No more payloads at 0x10005f94000
+TTY> No valid payload found
+TTY> dart: dart /arm-io/dart-usb0 at 0x382f80000 is a t8110
+TTY> USB0: initialized at 0x10006554090
+TTY> dart: dart /arm-io/dart-usb1 at 0x38af80000 is a t8110
+TTY> USB1: initialized at 0x10006554560
+TTY> dart: dart /arm-io/dart-usb2 at 0x392f80000 is a t8110
+TTY> USB2: initialized at 0x10006554a60
+TTY> Running proxy...
+Proxy is alive again
+m1n1 base: 0x10005e88000
+Fetching ADT (0x00094000 bytes)...
+CHIPID=0x6040 base=0x10005e88000
+=== BEFORE cpufreq_init: CLUSTER_PSTATE 0x20020 ===
+  ECPU0 = 0x0000000000400101  DESIRED1=1 SET=0 BUSY=0
+  PCPU0 = 0x0000000000400101  DESIRED1=1 SET=0 BUSY=0
+  PCPU1 = 0x0000000000400101  DESIRED1=1 SET=0 BUSY=0
+>>> calling p.cpufreq_init() ...
+TTY> cpufreq: Initializing clusters
+cpufreq_init() retval = 0 (0 = success)
+=== AFTER cpufreq_init: CLUSTER_PSTATE 0x20020 ===
+  ECPU0 = 0x0000000000400105  DESIRED1=5 SET=0 BUSY=0
+  PCPU0 = 0x0000000000400106  DESIRED1=6 SET=0 BUSY=0
+  PCPU1 = 0x0000000000400106  DESIRED1=6 SET=0 BUSY=0
+post-call sanity: chipid=0x6040 (proxy alive)

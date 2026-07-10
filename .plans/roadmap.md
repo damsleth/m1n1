@@ -4,15 +4,60 @@ End-goal: a bootable Linux distro on this MacBook Pro 16" M4 Pro with GPU accel,
 WiFi, Bluetooth, keyboard/trackpad, audio, webcam, power management — daily-driver
 comfort comparable to macOS.
 
-Written 2026-07-10. Companion docs: `t6040-bringup-plan.md` (Stage A detail),
-`2026-07-09-t6040-first-light-session.md` (what already happened).
+Written 2026-07-10, last updated 2026-07-10 (post-SMP session). Companion docs:
+`2026-07-10-t6040-cpufreq-plan.md` (Stage B first item — the next step, detailed),
+`t6040-dt-checklist.md` (Stage C prep). Finished plans/logs archived in `done/`:
+Stage A bring-up plan, first-light session (2026-07-09), SMP session log (2026-07-10).
+Next step detailed in `2026-07-10-t6040-mcc-plan.md`. Unposted #asahi-dev drafts
+awaiting review: `2026-07-10-t6040-smp-writeup.md`, `2026-07-10-t6040-cpufreq-writeup.md`.
 
 ## Where we are
 
 **First light achieved 2026-07-09.** m1n1 v1.6.0+ boots via raw kmutil enrollment:
 fb console 3024x1964, AIC3 up, pmgr 485 devices, 3 USB DARTs, "Running proxy...".
-Verified: chip-id 0x6040, `EARLY_UART_BASE`. Unverified: SMP start offset.
-Known gap already logged by m1n1 itself: `cpufreq: Chip 0x6040 is unsupported`.
+
+**Stage A complete 2026-07-10 — proxy solid, all 14 cores.** Verified this session
+over USB from the M1 host: chip-id 0x6040, `EARLY_UART_BASE`, and the last untested
+constant — `CPU_START_OFF_T6031` (0x88000) is **correct for Brava**. All 14 cores
+start and stay parked; execute-and-return proven via `smp_call_sync` on both an
+E-core and a P-core (uploaded leaf, on-target readback, deterministic returns).
+Per-core MPIDR mapped: E-cluster smp_id 0-3 (Aff2=0), P-cl0 smp_id 4-8 (Aff2=1
+Aff1=1, boot=4), P-cl1 smp_id 10-14 (Aff2=1 Aff1=2); smp_id 9 gap is Apple's
+non-contiguous ADT id on the P-cl0→P-cl1 boundary. 4E + 5P + 5P = 14.
+
+**broken_wfi resolved (local fork):** wfi/wfit lose architectural state on M4
+secondaries, so they park in `wfe` instead of `deep_wfi()`. Flag on `features_m4`
++ proxyclient CPUFeatures parse; `broken_wfi=True, fast_ipi=True, actlr_el2=True,
+apple_sysregs_unlocked=False` confirmed live.
+
+**Dev loop live (2026-07-10):** local build chain fixed (rustup nightly + LLVM;
+see memory `m1n1-build-toolchain-m1host`), `make` → `chainload.py -r build/m1n1.bin`
+→ proxy works, ~seconds, kmutil retired. Freshly-built `m1n1.elf` symbols are valid
+against the running image once chainloaded (verified via RELATIVE-reloc byte-match).
+
+**Stage B item 1 — cpufreq: DONE (minimal), 2026-07-10.** `src/cpufreq.c` patched:
+T6040 reuses `t6031_clusters` (bases verified 3 ways); new `t6040_features` =
+{cpu-apsc, cpu-fixed-freq-pll-relock} only. `cpufreq_init()` returns 0, enables
+APSC (clusters → nominal pstate E5/P6), no more "unsupported". Detailed in
+`2026-07-10-t6040-cpufreq-plan.md`; writeup drafted.
+- **Deferred:** ppt/llc/amx-thrtl — the t6030 throttle offsets (0x40xxx) SError on
+  T6040 P-clusters; correct T6040 register map needs RE (open question to #asahi-dev).
+
+### Current working / not-working snapshot
+
+| Works | Not yet |
+|---|---|
+| Raw boot to proxy, EL2, fb 3024×1964, AIC3, pmgr (485 dev), USB DARTs | Linux boot (Stage B–C incomplete) |
+| SMP: 14/14 cores, execute-and-return, MPIDR map | MCC (`mcc,t6041` unsupported — **next**) |
+| broken_wfi handled (wfe park) | cpufreq throttles (offsets unknown) |
+| cpufreq pstate/APSC (minimal) | PCIe/ATC, kboot FDT, cluster DVFS tables |
+| Local build + chainload dev loop | hv/XNU tracing (SPTM-blocked on M4) |
+
+Next target (boot-log gap #2): `MCC: Unsupported version:mcc,t6041` → Stage B
+item 2, detailed in `2026-07-10-t6040-mcc-plan.md`.
+
+**Upstreaming pending** (drafts ready, awaiting review/post): SMP/broken_wfi/MPIDR
+findings + confirmed constants; cpufreq patch + throttle-offset question.
 
 One structural constraint colors everything below: **M4 = raw boot only** (SPTM
 owns the mach-o path). Apple-private sysregs are locked. Linux itself doesn't
@@ -37,17 +82,20 @@ A→D are sequential. E/F/G parallelize after D. H wraps it all.
 
 ---
 
-## Stage A — finish the current plan (proxy solid, all cores)
+## Stage A — proxy solid, all cores ✅ COMPLETE (2026-07-10)
 
-*This is `t6040-bringup-plan.md` phases 2–4. Days, not weeks.*
+*Was `done/t6040-bringup-plan.md` phases 2–4. Took days, as scoped.*
 
-- [ ] Second machine + `shell.py` → proxy prompt (cherry-pick PR #616 if SPMI chokes)
-- [ ] `smp.start_secondaries()` — validates `CPU_START_OFF_T6031` 0x88000 reuse
-      (src/smp.c:296), the last untested constant. All 14 cores or a one-line fix.
-- [ ] `chainload.py -r build/m1n1.bin` reliable → 10-second dev loop, kmutil retired
-- [ ] Upstream: confirmed constants, features_m4 notes, raw-boot-on-26.2 doc note
+- [x] Second machine + `shell.py` → proxy prompt (M1 host over USB; no PR #616 needed)
+- [x] `smp.start_secondaries()` — `CPU_START_OFF_T6031` 0x88000 (src/smp.c:296)
+      **validated correct**; all 14 cores up. Plus execute-and-return + MPIDR map.
+- [x] `chainload.py -r build/m1n1.bin` reliable → ~10-second dev loop, kmutil retired
+      **(done 2026-07-10, build chain fixed)**
+- [ ] Upstream: confirmed constants, features_m4/broken_wfi notes, raw-boot doc note
+      *(residual — draft ready in `2026-07-10-t6040-smp-writeup.md`)*
 
-**Exit:** proxy + chainload stable across reboots, 14/14 cores.
+**Exit:** ✅ proxy stable across reboots, 14/14 cores. (chainload dev loop + upstream
+carry forward as small residuals; neither blocks Stage B.)
 
 ## Stage B — m1n1 grows Linux-boot support for T6040
 
@@ -55,11 +103,12 @@ A→D are sequential. E/F/G parallelize after D. H wraps it all.
 M3 template (commits 83364d0→5393f41) replayed on T6040. Weeks. All of it is
 doable solo with the proxy + ADT dumps; this is the highest-leverage local work.*
 
-1. **cpufreq** (`src/cpufreq.c`) — T6040 cluster tables/DVFS init. The boot log
-   already names this gap. Extract states from ADT `/arm-io/pmgr` + cluster nodes;
-   follow the t6031 entry as template.
-2. **MCC** (`src/mcc.c`) — memory cache controller layout, `mcc,t8132`-family.
-   Needed for memory BW / DCP later.
+1. ✅ **cpufreq** (`src/cpufreq.c`) — **DONE (minimal) 2026-07-10.** T6040 reuses
+   `t6031_clusters`; pstate/APSC working. Throttle features deferred (t6030 offsets
+   SError on T6040 P-clusters → need RE). See `2026-07-10-t6040-cpufreq-plan.md`.
+2. **MCC** (`src/mcc.c`) — **← NEXT.** ADT node is `mcc,t6041`; `mcc_init()` has no
+   branch for it (boot-log gap). `mcc_init_t6031` is ADT-driven → likely reuse.
+   Detailed in `2026-07-10-t6040-mcc-plan.md`. Needed for memory BW / DCP later.
 3. **PCIe** (`src/pcie.c` + tunables) — `apcie` ADT bring-up for T6040. This is
    the WiFi/BT prerequisite: both sit on the Apple PCIe bus.
 4. **ATC/USB tunables + DART config** for the kernel handoff.

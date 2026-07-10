@@ -1,0 +1,65 @@
+m1n1 base: 0x10004b08000
+Fetching ADT (0x00094000 bytes)...
+CHIPID=0x6040 broken_wfi=True fast_ipi=True actlr_el2=True apple_sysregs_unlocked=False
+m1n1 base: 0x10004b08000
+Fetching ADT (0x00094000 bytes)...
+LEAF @ 0x1000fa9c200  bytes=0000018bc0035fd6  (add x0,x0,x1 ; ret)
+READBACK        bytes=0000018bc0035fd6  match=True
+--- E-core CPU 1 ---
+  smp_call_sync(cpu=1, 0x1000fa9c200, 0xdead0000, 0x0000beef) -> 0x00000000deadbeef  expect 0xdeadbeef  [OK]
+  smp_call_sync(cpu=1, 0x1000fa9c200, 0x11110000, 0x00002222) -> 0x0000000011112222  expect 0x11112222  [OK]
+--- P-core CPU 5 ---
+  smp_call_sync(cpu=5, 0x1000fa9c200, 0xdead0000, 0x0000beef) -> 0x00000000deadbeef  expect 0xdeadbeef  [OK]
+  smp_call_sync(cpu=5, 0x1000fa9c200, 0x11110000, 0x00002222) -> 0x0000000011112222  expect 0x11112222  [OK]
+m1n1 base: 0x10004b08000
+Fetching ADT (0x00094000 bytes)...
+LEAF @ 0x1000fa9c200  bytes=a00038d5c0035fd6  (mrs x0, mpidr_el1 ; ret)
+CPU clust  src                     MPIDR  Aff3 Aff2 Aff1 Aff0
+  0 E-cl   smp_call   0x0000000080000000  0x00 0x00 0x00 0x00
+  1 E-cl   smp_call   0x0000000080000001  0x00 0x00 0x00 0x01
+  2 E-cl   smp_call   0x0000000080000002  0x00 0x00 0x00 0x02
+  3 E-cl   smp_call   0x0000000080000003  0x00 0x00 0x00 0x03
+Traceback (most recent call last):
+  File "/private/tmp/claude-501/-Users-damsleth-Code-m1n1/63c638db-8d3f-4779-9ce8-0e9cb54b7bbe/scratchpad/stepC.py", line 26, in <module>
+    m = u.mrs("mpidr_el1") & M
+  File "/Users/damsleth/Code/m1n1/proxyclient/m1n1/proxyutils.py", line 173, in mrs
+    op0, op1, CRn, CRm, op2 = sysreg_parse(reg)
+  File "/Users/damsleth/Code/m1n1/proxyclient/m1n1/sysreg.py", line 60, in sysreg_parse
+    raise Exception(f"Unknown sysreg name {s}")
+Exception: Unknown sysreg name mpidr_el1
+m1n1 base: 0x10004b08000
+Fetching ADT (0x00094000 bytes)...
+LEAF @ 0x1000fa9c200  bytes=a00038d5c0035fd6  (mrs x0, mpidr_el1 ; ret)
+CPU clust  src                     MPIDR  Aff3 Aff2 Aff1 Aff0
+  0 E-cl   smp_call   0x0000000080000000  0x00 0x00 0x00 0x00
+  1 E-cl   smp_call   0x0000000080000001  0x00 0x00 0x00 0x01
+  2 E-cl   smp_call   0x0000000080000002  0x00 0x00 0x00 0x02
+  3 E-cl   smp_call   0x0000000080000003  0x00 0x00 0x00 0x03
+  4 P-cl0  exec(boot) 0x0000000080010100  0x00 0x01 0x01 0x00  <-- boot
+  5 P-cl0  smp_call   0x0000000080010101  0x00 0x01 0x01 0x01
+  6 P-cl0  smp_call   0x0000000080010102  0x00 0x01 0x01 0x02
+  7 P-cl0  smp_call   0x0000000080010103  0x00 0x01 0x01 0x03
+  8 P-cl0  smp_call   0x0000000080010104  0x00 0x01 0x01 0x04
+ 10 P-cl1  smp_call   0x0000000080010200  0x00 0x01 0x02 0x00
+ 11 P-cl1  smp_call   0x0000000080010201  0x00 0x01 0x02 0x01
+ 12 P-cl1  smp_call   0x0000000080010202  0x00 0x01 0x02 0x02
+ 13 P-cl1  smp_call   0x0000000080010203  0x00 0x01 0x02 0x03
+ 14 P-cl1  smp_call   0x0000000080010204  0x00 0x01 0x02 0x04
+m1n1 base: 0x10004b08000
+Fetching ADT (0x00094000 bytes)...
+HEARTBEAT leaf @ 0x1000fa9c200 (add x0,x0,x1; ret). Per core: arg0=cpu<<8, arg1=0xa5 -> expect (cpu<<8)|0xa5
+  CPU  0: alive=      1  ret=0x00a5  expect=0x00a5  [OK]
+  CPU  1: alive=      1  ret=0x01a5  expect=0x01a5  [OK]
+  CPU  2: alive=      1  ret=0x02a5  expect=0x02a5  [OK]
+  CPU  3: alive=      1  ret=0x03a5  expect=0x03a5  [OK]
+  CPU  4: alive=-(boot)  ret=0x04a5  expect=0x04a5  [OK]
+  CPU  5: alive=      1  ret=0x05a5  expect=0x05a5  [OK]
+  CPU  6: alive=      1  ret=0x06a5  expect=0x06a5  [OK]
+  CPU  7: alive=      1  ret=0x07a5  expect=0x07a5  [OK]
+  CPU  8: alive=      1  ret=0x08a5  expect=0x08a5  [OK]
+  CPU 10: alive=      1  ret=0x0aa5  expect=0x0aa5  [OK]
+  CPU 11: alive=      1  ret=0x0ba5  expect=0x0ba5  [OK]
+  CPU 12: alive=      1  ret=0x0ca5  expect=0x0ca5  [OK]
+  CPU 13: alive=      1  ret=0x0da5  expect=0x0da5  [OK]
+  CPU 14: alive=      1  ret=0x0ea5  expect=0x0ea5  [OK]
+HEARTBEAT: ALL 14 CORES OK
