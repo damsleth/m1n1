@@ -6,7 +6,60 @@ userspace. Hardware log:
 
 `apple-dart 514800000.iommu: DART [pagesize 4000, 16 streams, bypass support: 1, bypass forced: 1, AS 42 -> 42] initialized`
 
-Full MTP/HID remains untested.
+Full MTP/HID first test reached userspace safely but timed out at the RTKit wake
+boundary:
+
+`dockchannel-hid 514600000.hid: error -ETIME: failed to wake coprocessor`
+
+The DART attached the HID device to IOMMU group 0 and remained healthy. No
+DockChannel HID traffic or input device was created. A diagnostic-only Image was
+built to log ASC CPU control/status before and after RUN, ASC mailbox messages,
+receive IRQ activity, and a late mailbox poll after timeout:
+
+- `Image-keyboard-debug` SHA-256:
+  `b30a1cc6eaf8a32be6589411b8d5bb37af08244f3c9d6944ef281058543d16ba`
+
+Do not run that diagnostic Image again: three attempts exposed an unrelated,
+layout/timing-sensitive early-boot halt before the MTP driver (twice at
+`Demotion targets for Node 0: Null`, once during PMGR probing). The clean
+`Image-keyboard` consistently reaches the MTP wake timeout.
+
+Read-only proxy baseline after recovery:
+
+- `0x514600044` CPU control = `0x00000000`
+- `0x514600048` CPU status = `0x0000006a` (STOPPED set, RUNNING clear)
+- `0x514608110` A2I control = `0x00020001` (enabled, empty)
+- `0x514608114` I2A control = `0x00020001` (enabled, empty)
+
+Thus the timeout is not caused by a stale mailbox, and writing literal `0x10`
+does not lose any pre-existing CPU-control bits. The next discriminating test is
+a gated proxy RUN pulse using only the same start/stop control values already
+used by the Linux driver.
+
+The approved proxy RUN pulse produced:
+
+- after `0x514600044 = 0x10` and 100 ms: control `0x10`, status `0x6c`;
+- A2I/I2A remained `0x00020001` (enabled and empty);
+- after restoring control to zero, status remained `0x6c` both at 100 ms and
+  several seconds later.
+
+Relative to the baseline `0x6a`, STOPPED cleared and IRQ_NOT_PEND set, but the
+normal RUNNING bit did not set. The known MTP SRAM at `0x514c00000` is populated
+(non-zero vector/header data), so this is not simply an absent firmware image.
+However, the proxy environment's known SID-0 DART TCR was `0x1`, not Linux's
+identity/bypass `0x6`; the proxy pulse therefore cannot reproduce the complete
+Linux startup environment and may stall on an early external access. DART error
+status was zero. Do not attempt a PMGR reset or guess another ASC register.
+
+The first Linux retry after that pulse was contaminated: chainloading m1n1 with
+`chainload.py -r` reloads software but does not hardware-reset MTP. Linux reported
+`apple_dart_t8110_irq`, disabled Linux IRQ 40, initialized DART, then halted at
+`Demotion targets for Node 0: null`. This is consistent with the still-released
+MTP racing DART reprogramming, not with the userspace-only diagnostic initramfs.
+After the 20-second hardware-watchdog warm reset, read-only proxy state returned
+to the pristine baseline (`CPU_CONTROL=0`, `CPU_STATUS=0x6a`, mailbox controls
+`0x20001`, SID-0 TCR `0x1`, DART error zero). Retry the clean Image only from
+this hardware-reset baseline.
 
 ## Source and hardware evidence
 

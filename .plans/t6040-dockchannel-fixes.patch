@@ -1,0 +1,30 @@
+HID: apple-dockchannel-hid: add missing hid_ll_driver .stop callback
+
+hid_hw_stop() calls hdev->ll_driver->stop(hdev) unconditionally, but dchid_ll
+defined no .stop, so any probe-error path reaching hid_hw_stop() on a
+DockChannel subdevice branched to NULL (seen on t6040 J614s: unnamed
+0000:0000 interface, report descriptor parse fails, hid-generic -22 ->
+kernel NULL pointer dereference, ESR EC=0x21 IABT).
+
+--- a/drivers/hid/apple-dockchannel-hid/apple_dockchannel_hid.c
++++ b/drivers/hid/apple-dockchannel-hid/apple_dockchannel_hid.c
+@@ -441,6 +441,11 @@
+ 	return 0;
+ }
+ 
++static void dchid_stop(struct hid_device *hdev)
++{
++	/* no-op: interfaces are torn down with the transport */
++}
++
+ static int dchid_open(struct hid_device *hdev)
+ {
+ 	struct dchid_iface *iface = hdev->driver_data;
+@@ -517,6 +522,7 @@
+ 
+ static const struct hid_ll_driver dchid_ll = {
+ 	.start = dchid_start,
++	.stop = dchid_stop,
+ 	.open = dchid_open,
+ 	.close = dchid_close,
+ 	.parse = dchid_parse,
