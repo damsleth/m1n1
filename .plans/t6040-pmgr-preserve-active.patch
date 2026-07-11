@@ -1,0 +1,16 @@
+diff --git a/drivers/pmdomain/apple/pmgr-pwrstate.c b/drivers/pmdomain/apple/pmgr-pwrstate.c
+--- a/drivers/pmdomain/apple/pmgr-pwrstate.c
++++ b/drivers/pmdomain/apple/pmgr-pwrstate.c
+@@ -282,6 +282,11 @@ static int apple_pmgr_ps_probe(struct platform_device *pdev)
+ 		 name, ps->offset);
+ 	active = apple_pmgr_ps_is_active(ps);
+ 	dev_info(dev, "PMGRDBG %s offset %#x: initial state read done (active=%u)\n",
+ 		 name, ps->offset, active);
++	if (active && of_property_read_bool(node->parent, "apple,preserve-active")) {
++		ps->genpd.flags |= GENPD_FLAG_ALWAYS_ON;
++		dev_info(dev, "PMGRDBG %s offset %#x: preserving boot-active domain\n",
++			 name, ps->offset);
++	}
+ 	if (of_property_read_bool(node, "apple,always-on")) {
+ 		ps->genpd.flags |= GENPD_FLAG_ALWAYS_ON;
+ 		if (!active) {

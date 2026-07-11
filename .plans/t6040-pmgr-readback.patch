@@ -1,0 +1,27 @@
+diff --git a/drivers/pmdomain/apple/pmgr-pwrstate.c b/drivers/pmdomain/apple/pmgr-pwrstate.c
+--- a/drivers/pmdomain/apple/pmgr-pwrstate.c
++++ b/drivers/pmdomain/apple/pmgr-pwrstate.c
+@@ -215,8 +215,10 @@ static int apple_pmgr_ps_probe(struct platform_device *pdev)
+ 	struct regmap *regmap;
+ 	struct of_phandle_iterator it;
+ 	int ret;
++	int verify_ret;
+ 	const char *name;
+ 	bool active;
++	u32 verify;
+ 
+ 	dev_info(dev, "PMGRDBG %pOF: probe entry\n", node);
+ 
+@@ -290,6 +292,12 @@ static int apple_pmgr_ps_probe(struct platform_device *pdev)
+ 			 name, ps->offset);
+ 		regmap_update_bits(regmap, ps->offset, APPLE_PMGR_FLAGS | APPLE_PMGR_AUTO_ENABLE,
+ 				   APPLE_PMGR_AUTO_ENABLE);
++		dev_info(dev, "PMGRDBG %s offset %#x: auto-enable readback begin\n",
++			 name, ps->offset);
++		mb();
++		verify_ret = regmap_read(regmap, ps->offset, &verify);
++		dev_info(dev, "PMGRDBG %s offset %#x: auto-enable readback done (ret=%d reg=%#x)\n",
++			 name, ps->offset, verify_ret, verify);
+ 		dev_info(dev, "PMGRDBG %s offset %#x: auto-enable write done\n",
+ 			 name, ps->offset);
+ 	}

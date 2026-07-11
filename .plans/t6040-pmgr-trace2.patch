@@ -1,0 +1,69 @@
+diff --git a/drivers/pmdomain/apple/pmgr-pwrstate.c b/drivers/pmdomain/apple/pmgr-pwrstate.c
+--- a/drivers/pmdomain/apple/pmgr-pwrstate.c
++++ b/drivers/pmdomain/apple/pmgr-pwrstate.c
+@@ -54,10 +54,16 @@ static int apple_pmgr_ps_set(struct generic_pm_domain *genpd, u32 pstate, bool a
+ 	int ret;
+ 	struct apple_pmgr_ps *ps = genpd_to_apple_pmgr_ps(genpd);
+ 	u32 reg;
+ 
++	dev_info(ps->dev, "PMGRDBG %s offset %#x: set begin (target=%#x auto=%u)\n",
++		 genpd->name, ps->offset, pstate, auto_enable);
++	dev_info(ps->dev, "PMGRDBG %s offset %#x: set state read begin\n",
++		 genpd->name, ps->offset);
+ 	ret = regmap_read(ps->regmap, ps->offset, &reg);
+ 	if (ret < 0)
+ 		return ret;
++	dev_info(ps->dev, "PMGRDBG %s offset %#x: set state read done (reg=%#x)\n",
++		 genpd->name, ps->offset, reg);
+ 
+ 	/* Resets are synchronous, and only work if the device is powered and clocked. */
+ 	if (reg & APPLE_PMGR_RESET && pstate != APPLE_PMGR_PS_ACTIVE)
+@@ -69,12 +75,20 @@ static int apple_pmgr_ps_set(struct generic_pm_domain *genpd, u32 pstate, bool a
+ 
+ 	dev_dbg(ps->dev, "PS %s: pwrstate = 0x%x: 0x%x\n", genpd->name, pstate, reg);
+ 
++	dev_info(ps->dev, "PMGRDBG %s offset %#x: target write begin (reg=%#x)\n",
++		 genpd->name, ps->offset, reg);
+ 	regmap_write(ps->regmap, ps->offset, reg);
++	dev_info(ps->dev, "PMGRDBG %s offset %#x: target write done\n",
++		 genpd->name, ps->offset);
+ 
++	dev_info(ps->dev, "PMGRDBG %s offset %#x: target poll begin\n",
++		 genpd->name, ps->offset);
+ 	ret = regmap_read_poll_timeout_atomic(
+ 		ps->regmap, ps->offset, reg,
+ 		(FIELD_GET(APPLE_PMGR_PS_ACTUAL, reg) == pstate), 1,
+ 		APPLE_PMGR_PS_SET_TIMEOUT);
++	dev_info(ps->dev, "PMGRDBG %s offset %#x: target poll done (ret=%d reg=%#x)\n",
++		 genpd->name, ps->offset, ret, reg);
+ 	if (ret < 0)
+ 		dev_err(ps->dev, "PS %s: Failed to reach power state 0x%x (now: 0x%x)\n",
+ 			genpd->name, pstate, reg);
+@@ -83,7 +97,11 @@ static int apple_pmgr_ps_set(struct generic_pm_domain *genpd, u32 pstate, bool a
+ 		/* Not all devices implement this; this is a no-op where not implemented. */
+ 		reg &= ~APPLE_PMGR_FLAGS;
+ 		reg |= APPLE_PMGR_AUTO_ENABLE;
++		dev_info(ps->dev, "PMGRDBG %s offset %#x: set auto-enable write begin\n",
++			 genpd->name, ps->offset);
+ 		regmap_write(ps->regmap, ps->offset, reg);
++		dev_info(ps->dev, "PMGRDBG %s offset %#x: set auto-enable write done\n",
++			 genpd->name, ps->offset);
+ 	}
+ 
+ 	return ret;
+@@ -200,11 +218,15 @@ static int apple_pmgr_ps_probe(struct platform_device *pdev)
+ 	int ret;
+ 	const char *name;
+ 	bool active;
+ 
++	dev_info(dev, "PMGRDBG %pOF: probe entry\n", node);
++
+ 	regmap = syscon_node_to_regmap(node->parent);
+ 	if (IS_ERR(regmap))
+ 		return PTR_ERR(regmap);
+ 
++	dev_info(dev, "PMGRDBG %pOF: parent regmap acquired\n", node);
++
+ 	ps = devm_kzalloc(dev, sizeof(*ps), GFP_KERNEL);
+ 	if (!ps)
+ 		return -ENOMEM;
