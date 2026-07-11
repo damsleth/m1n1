@@ -185,14 +185,18 @@ struct entry dapf_entries[] = {
 // clean ADT signal, so gate on chip_id:
 //   t8132 "Neo": only dart-aop/dart-isp SError; dart-mtp/pmp init fine and mtp
 //     needs them (yuka).
-//   t6040 M4 Pro: dart-mtp ALSO SErrors (confirmed on HW 2026-07-11 — skipping
-//     only aop/isp was not enough, the same SError recurred right after
-//     "Initialized dart-mtp"). We don't need any of these DARTs for a headless
-//     bring-up boot, so skip the whole set here pending proper RE.
+//   t6040 M4 Pro: an earlier session blamed dart-mtp because the SError surfaced
+//     right after "Initialized dart-mtp" — but the error is ASYNC and the true
+//     trigger was a later entry. Confirmed on HW 2026-07-11 (session 4): all six
+//     dart-mtp DAPF writes at 0x514810000 succeed from the proxy, and programming
+//     them is REQUIRED for the MTP (keyboard/trackpad) firmware to boot: without
+//     them it faults on its nub windows (its own PS regs at 0x50830c000 etc.)
+//     right after RUN; with them it reaches RUNNING (status 0x4d) and sends the
+//     RTKit hello. Keep aop/pmp/isp skipped pending individual retests.
 static bool dapf_skip_entry(const struct entry *e)
 {
     if (chip_id == T6040)
-        return true;
+        return strcmp(e->path, "/arm-io/dart-mtp") != 0;
     if (chip_id == T8132)
         return e->t8132_broken;
     return false;
