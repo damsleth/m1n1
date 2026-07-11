@@ -212,7 +212,7 @@ echo "   display. Mirrors mischa85's t6041 baremetal boot-to-userspace recipe. =
     -d ARM64_SME
 if [ "${DOCKCHANNEL:-0}" = "1" ]; then
     ./scripts/config --file .config \
-        -e APPLE_MAILBOX -e APPLE_RTKIT -e IOMMU_APPLE_DART \
+        -e APPLE_MAILBOX -e APPLE_RTKIT -e APPLE_DART \
         -e HID -e HID_APPLE -e APPLE_DOCKCHANNEL \
         -e APPLE_DOCKCHANNEL_HID
 fi
@@ -221,7 +221,7 @@ echo "-- resulting fbcon-relevant config --"
 grep -E "CONFIG_(DRM_SIMPLEDRM|DRM_FBDEV_EMULATION|FRAMEBUFFER_CONSOLE|ARM64_SME)=" .config || true
 grep -E "CONFIG_(WATCHDOG|APPLE_WATCHDOG)=" .config || true
 if [ "${DOCKCHANNEL:-0}" = "1" ]; then
-    grep -E "CONFIG_(APPLE_MAILBOX|APPLE_RTKIT|IOMMU_APPLE_DART|HID_APPLE|APPLE_DOCKCHANNEL|APPLE_DOCKCHANNEL_HID)=" .config || true
+    grep -E "CONFIG_(APPLE_MAILBOX|APPLE_RTKIT|APPLE_DART|HID_APPLE|APPLE_DOCKCHANNEL|APPLE_DOCKCHANNEL_HID)=" .config || true
 fi
 grep -qE "CONFIG_ARM64_SME=y" .config && echo "WARN: SME still enabled!" || echo "SME disabled OK"
 
