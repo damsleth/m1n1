@@ -31,6 +31,12 @@ git checkout -q "$BRANCH"
 echo "== copy in our t6040 DT files (uncommitted on host) =="
 cp /src/$APPLE/t6040.dtsi        $APPLE/
 cp /src/$APPLE/t6040-j614s.dts   $APPLE/
+if [ -f /src/$APPLE/t6040-j614s-kbd.dts ]; then
+    cp /src/$APPLE/t6040-j614s-kbd.dts $APPLE/
+fi
+if [ -f /src/$APPLE/t6040-j614s-kbd-infra.dts ]; then
+    cp /src/$APPLE/t6040-j614s-kbd-infra.dts $APPLE/
+fi
 cp /src/$APPLE/t6040-pmgr.dtsi   $APPLE/
 cp /src/$APPLE/Makefile          $APPLE/
 
@@ -165,6 +171,25 @@ if [ "${PMGR_FUNCTIONAL:-0}" = "1" ]; then
     fi
 fi
 
+if [ "${DOCKCHANNEL:-0}" = "1" ]; then
+    echo "== import local DockChannel mailbox + HID transport series =="
+    if [ -f drivers/hid/apple-dockchannel-hid/apple_dockchannel_hid.c ]; then
+        echo "DockChannel HID series already applied"
+    else
+        for commit in \
+            d2acb86f70a252cc458101d855e6e4c950031174 \
+            f2b7718fd46c34b8c500ae77bdb7129de3494105 \
+            c4a0e3d1b55d2ceca114681c1bae7aeb9caf06ea \
+            356985c33ceb197790012a2362542c2b62baea0a; do
+            git show --format=email --no-ext-diff "$commit" | git apply
+        done
+        # The branch tip corrects the byte FIFO TX accessor to a 32-bit write.
+        git show --format=email --no-ext-diff ba89d30070d42082a5eca95419e72f1e132b0893 \
+            -- drivers/mailbox/apple-dockchannel.c | git apply
+        echo "DockChannel HID series applied OK"
+    fi
+fi
+
 echo "== verify netfilter case-collision is healed in the clone =="
 git status --short include/uapi/linux/netfilter/xt_mark.h || true
 
@@ -183,17 +208,35 @@ echo "   display. Mirrors mischa85's t6041 baremetal boot-to-userspace recipe. =
     -e DRM -e DRM_SIMPLEDRM -e DRM_FBDEV_EMULATION \
     -e FB -e VT -e VT_CONSOLE \
     -e FRAMEBUFFER_CONSOLE -e FRAMEBUFFER_CONSOLE_DETECT_PRIMARY \
-    -e LOGO \
+    -e LOGO -e WATCHDOG -e APPLE_WATCHDOG \
     -d ARM64_SME
+if [ "${DOCKCHANNEL:-0}" = "1" ]; then
+    ./scripts/config --file .config \
+        -e APPLE_MAILBOX -e APPLE_RTKIT -e IOMMU_APPLE_DART \
+        -e HID -e HID_APPLE -e APPLE_DOCKCHANNEL \
+        -e APPLE_DOCKCHANNEL_HID
+fi
 make ARCH=arm64 olddefconfig >/dev/null
 echo "-- resulting fbcon-relevant config --"
 grep -E "CONFIG_(DRM_SIMPLEDRM|DRM_FBDEV_EMULATION|FRAMEBUFFER_CONSOLE|ARM64_SME)=" .config || true
+grep -E "CONFIG_(WATCHDOG|APPLE_WATCHDOG)=" .config || true
+if [ "${DOCKCHANNEL:-0}" = "1" ]; then
+    grep -E "CONFIG_(APPLE_MAILBOX|APPLE_RTKIT|IOMMU_APPLE_DART|HID_APPLE|APPLE_DOCKCHANNEL|APPLE_DOCKCHANNEL_HID)=" .config || true
+fi
 grep -qE "CONFIG_ARM64_SME=y" .config && echo "WARN: SME still enabled!" || echo "SME disabled OK"
 
 NPROC=$(nproc)
 echo "== build DTB first (validates our DT in the real kbuild) =="
 make ARCH=arm64 -j"$NPROC" apple/t6040-j614s.dtb
 cp $APPLE/t6040-j614s.dtb /out/ && echo "DTB -> /out/t6040-j614s.dtb"
+if [ "${DOCKCHANNEL:-0}" = "1" ]; then
+    make ARCH=arm64 -j"$NPROC" apple/t6040-j614s-kbd-infra.dtb
+    cp $APPLE/t6040-j614s-kbd-infra.dtb /out/ \
+        && echo "DTB -> /out/t6040-j614s-kbd-infra.dtb"
+    make ARCH=arm64 -j"$NPROC" apple/t6040-j614s-kbd.dtb
+    cp $APPLE/t6040-j614s-kbd.dtb /out/ \
+        && echo "DTB -> /out/t6040-j614s-kbd.dtb"
+fi
 
 if [ "${1:-}" = "image" ]; then
     echo "== build kernel Image (slow) =="
