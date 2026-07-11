@@ -26,6 +26,7 @@
 #include "types.h"
 #include "usb.h"
 #include "utils.h"
+#include "wdt.h"
 #include "xnuboot.h"
 
 #include "libfdt/libfdt.h"
@@ -2878,12 +2879,24 @@ int kboot_boot(void *kernel)
 
     usb_init();
     pcie_init();
-    // DIAGNOSTIC 2026-07-10: bisecting the kboot L2C SError; delivered right after
-    // dapf. Skip to see if dapf is the culprit or smp_set_wfe_mode/later. Revert.
-    // dapf_init_all();
+    // dapf_init_all() now gates the dart-aop/dart-isp filters off on M4-family
+    // SoCs (t6040/t8132), which are what raised the async L2C SError here; the
+    // dart-mtp/pmp filters still init. See src/dapf.c:m4_dapf_broken.
+    dapf_init_all();
 
     printf("Setting SMP mode to WFE...\n");
     smp_set_wfe_mode(true);
+
+    // BRING-UP DIAGNOSTIC (M4-family): the M4 has no early kernel serial console
+    // and no working hv relay (SPTM), so a hung kernel just sits on the logo with
+    // no way to recover except a manual power-cycle (which loses DRAM). Arm the
+    // watchdog so a hang auto-warm-resets back to the m1n1 proxy (DRAM retained,
+    // enabling a post-mortem RAM dump). Once the kernel boots far enough to run
+    // the apple_wdt driver (needs the /soc/wdt DT node), remove this or the
+    // watchdog will reset an otherwise-healthy system after the timeout.
+    if (chip_id == T6040 || chip_id == T8132)
+        wdt_arm_secs(20);
+
     printf("Preparing to boot kernel at %p with fdt at %p\n", kernel, dt);
 
     next_stage.entry = kernel;

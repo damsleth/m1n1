@@ -39,6 +39,24 @@ echo "== config (arm64 defconfig enables CONFIG_ARCH_APPLE) =="
 make ARCH=arm64 defconfig >/dev/null
 grep -q "CONFIG_ARCH_APPLE=y" .config && echo "ARCH_APPLE=y OK" || echo "WARN: ARCH_APPLE not set"
 
+echo "== force on-screen framebuffer console (the only working kernel console on"
+echo "   M4 raw-boot: no serial earlycon, no hv relay). Read output on the laptop"
+echo "   display. Mirrors mischa85's t6041 baremetal boot-to-userspace recipe. =="
+# simpledrm binds /chosen/framebuffer (m1n1 fills it in), FBDEV_EMULATION gives it
+# an fbdev, and FRAMEBUFFER_CONSOLE (fbcon) renders printk onto that fbdev. Without
+# all three you get the m1n1 logo and no text (defconfig ships DRM=m, simpledrm off).
+# ARM64_SME must be OFF on M4 (chaos_princess/StanfordAppliedCyber: SME breaks M4 boot).
+./scripts/config --file .config \
+    -e DRM -e DRM_SIMPLEDRM -e DRM_FBDEV_EMULATION \
+    -e FB -e VT -e VT_CONSOLE \
+    -e FRAMEBUFFER_CONSOLE -e FRAMEBUFFER_CONSOLE_DETECT_PRIMARY \
+    -e LOGO \
+    -d ARM64_SME
+make ARCH=arm64 olddefconfig >/dev/null
+echo "-- resulting fbcon-relevant config --"
+grep -E "CONFIG_(DRM_SIMPLEDRM|DRM_FBDEV_EMULATION|FRAMEBUFFER_CONSOLE|ARM64_SME)=" .config || true
+grep -qE "CONFIG_ARM64_SME=y" .config && echo "WARN: SME still enabled!" || echo "SME disabled OK"
+
 NPROC=$(nproc)
 echo "== build DTB first (validates our DT in the real kbuild) =="
 make ARCH=arm64 -j"$NPROC" apple/t6040-j614s.dtb
@@ -48,5 +66,8 @@ if [ "${1:-}" = "image" ]; then
     echo "== build kernel Image (slow) =="
     make ARCH=arm64 -j"$NPROC" Image
     cp arch/arm64/boot/Image /out/ && echo "Image -> /out/Image ($(du -h arch/arm64/boot/Image | cut -f1))"
+    # System.map lets t6040-ramdump.py locate __log_buf for a post-mortem console
+    # dump when the framebuffer stays blank (hang before simpledrm probes).
+    cp System.map /out/ && echo "System.map -> /out/System.map"
 fi
 echo "== done =="

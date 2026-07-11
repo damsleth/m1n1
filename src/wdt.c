@@ -9,7 +9,43 @@
 #define WDT_ALARM 0x14
 #define WDT_CTL   0x1c
 
+// Apple's watchdog counter is clocked by the ~24 MHz always-on reference. Only
+// used to convert seconds -> alarm ticks for wdt_arm_secs().
+#define WDT_CLK_HZ 24000000
+
 static u64 wdt_base = 0;
+
+// Populate wdt_base from the ADT if it isn't already known. Returns true on
+// success. wdt_disable() (run at startup) normally sets it, but wdt_arm_secs()
+// may be called on a path where that lookup was skipped or failed.
+static bool wdt_find_base(void)
+{
+    if (wdt_base)
+        return true;
+
+    int path[8];
+    int node = adt_path_offset_trace(adt, "/arm-io/wdt", path);
+    if (node < 0)
+        return false;
+
+    if (adt_get_reg(adt, path, "reg", 0, &wdt_base, NULL))
+        return false;
+
+    return wdt_base != 0;
+}
+
+void wdt_arm_secs(u32 secs)
+{
+    if (!wdt_find_base()) {
+        printf("WDT: could not arm, base unknown\n");
+        return;
+    }
+
+    write32(wdt_base + WDT_ALARM, (u32)((u64)secs * WDT_CLK_HZ));
+    write32(wdt_base + WDT_COUNT, 0);
+    write32(wdt_base + WDT_CTL, 4);
+    printf("WDT: armed for ~%us (warm reset on hang)\n", secs);
+}
 
 void wdt_disable(void)
 {
