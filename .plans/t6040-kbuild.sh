@@ -19,11 +19,13 @@ apt-get update -qq
 apt-get install -y -qq build-essential bc bison flex libssl-dev libelf-dev \
     python3 cpio kmod git >/dev/null
 
-if [ ! -d /build/linux/.git ]; then
+BUILD_DIR="${BUILD_DIR:-/build/linux}"
+
+if [ ! -d "$BUILD_DIR/.git" ]; then
     echo "== clone (case-correct checkout) =="
-    git clone --local --shared /src /build/linux
+    git clone --local --shared /src "$BUILD_DIR"
 fi
-cd /build/linux
+cd "$BUILD_DIR"
 git checkout -q "$BRANCH"
 
 echo "== copy in our t6040 DT files (uncommitted on host) =="
@@ -42,6 +44,8 @@ echo "== apply flokli's t6040 CODE patches (aic locked-sysreg skip + idle=nop) =
 if git apply --check /out/flokli-code.patch 2>/dev/null; then
     git apply /out/flokli-code.patch
     echo "flokli-code.patch applied OK"
+elif git apply -R --check /out/flokli-code.patch 2>/dev/null; then
+    echo "flokli-code.patch already applied"
 else
     echo "ERROR: flokli-code.patch does not apply cleanly to this tree:"
     git apply --check /out/flokli-code.patch || true
@@ -54,6 +58,111 @@ if sed -n '/static int aic_init_cpu/,/PMC FIQ/p' drivers/irqchip/irq-apple-aic.c
     echo "WARN: a locked-sysreg write is still active in aic_init_cpu!"
 else
     echo "aic_init_cpu locked-sysreg writes disabled OK"
+fi
+
+if [ "${PMGR_DEBUG:-0}" = "1" ]; then
+    echo "== apply T6040 PMGR visibility patch (late init + operation logging) =="
+    if grep -q 'late_initcall(apple_pmgr_ps_driver_init)' \
+        drivers/pmdomain/apple/pmgr-pwrstate.c; then
+        echo "t6040-pmgr-debug.patch already applied"
+    elif git apply --check /out/t6040-pmgr-debug.patch 2>/dev/null; then
+        git apply /out/t6040-pmgr-debug.patch
+        echo "t6040-pmgr-debug.patch applied OK"
+    else
+        echo "ERROR: t6040-pmgr-debug.patch does not apply cleanly:"
+        git apply --check /out/t6040-pmgr-debug.patch || true
+        exit 1
+    fi
+    grep -q 'late_initcall(apple_pmgr_ps_driver_init)' \
+        drivers/pmdomain/apple/pmgr-pwrstate.c \
+        && echo "PMGR late init verified OK"
+
+    echo "== apply T6040 PMGR transition trace patch =="
+    if grep -q 'set state read begin' drivers/pmdomain/apple/pmgr-pwrstate.c; then
+        echo "t6040-pmgr-trace2.patch already applied"
+    elif git apply --check /out/t6040-pmgr-trace2.patch 2>/dev/null; then
+        git apply /out/t6040-pmgr-trace2.patch
+        echo "t6040-pmgr-trace2.patch applied OK"
+    else
+        echo "ERROR: t6040-pmgr-trace2.patch does not apply cleanly:"
+        git apply --check /out/t6040-pmgr-trace2.patch || true
+        exit 1
+    fi
+
+    echo "== apply T6040 PMGR DT-controlled auto-enable exception =="
+    if grep -q 'apple,skip-auto-enable' drivers/pmdomain/apple/pmgr-pwrstate.c; then
+        echo "t6040-pmgr-skip-auto.patch already applied"
+    elif git apply --check /out/t6040-pmgr-skip-auto.patch 2>/dev/null; then
+        git apply /out/t6040-pmgr-skip-auto.patch
+        echo "t6040-pmgr-skip-auto.patch applied OK"
+    else
+        echo "ERROR: t6040-pmgr-skip-auto.patch does not apply cleanly:"
+        git apply --check /out/t6040-pmgr-skip-auto.patch || true
+        exit 1
+    fi
+
+    echo "== apply T6040 PMGR same-offset write serialization/readback =="
+    if grep -q 'auto-enable readback begin' drivers/pmdomain/apple/pmgr-pwrstate.c; then
+        echo "t6040-pmgr-readback.patch already applied"
+    elif git apply --check /out/t6040-pmgr-readback.patch 2>/dev/null; then
+        git apply /out/t6040-pmgr-readback.patch
+        echo "t6040-pmgr-readback.patch applied OK"
+    else
+        echo "ERROR: t6040-pmgr-readback.patch does not apply cleanly:"
+        git apply --check /out/t6040-pmgr-readback.patch || true
+        exit 1
+    fi
+
+    echo "== apply T6040 PMGR set() auto-enable serialization/readback =="
+    if grep -q 'set auto-enable readback begin' drivers/pmdomain/apple/pmgr-pwrstate.c; then
+        echo "t6040-pmgr-set-readback.patch already applied"
+    elif git apply --check /out/t6040-pmgr-set-readback.patch 2>/dev/null; then
+        git apply /out/t6040-pmgr-set-readback.patch
+        echo "t6040-pmgr-set-readback.patch applied OK"
+    else
+        echo "ERROR: t6040-pmgr-set-readback.patch does not apply cleanly:"
+        git apply --check /out/t6040-pmgr-set-readback.patch || true
+        exit 1
+    fi
+
+    echo "== apply T6040 PMGR set() DT-controlled auto-enable exception =="
+    if grep -q 'set auto-enable write skipped by DT' drivers/pmdomain/apple/pmgr-pwrstate.c; then
+        echo "t6040-pmgr-skip-set-auto.patch already applied"
+    elif git apply --check /out/t6040-pmgr-skip-set-auto.patch 2>/dev/null; then
+        git apply /out/t6040-pmgr-skip-set-auto.patch
+        echo "t6040-pmgr-skip-set-auto.patch applied OK"
+    else
+        echo "ERROR: t6040-pmgr-skip-set-auto.patch does not apply cleanly:"
+        git apply --check /out/t6040-pmgr-skip-set-auto.patch || true
+        exit 1
+    fi
+
+    echo "== apply T6040 PMGR preserve-boot-active policy =="
+    if grep -q 'preserving boot-active domain' drivers/pmdomain/apple/pmgr-pwrstate.c; then
+        echo "t6040-pmgr-preserve-active.patch already applied"
+    elif git apply --check /out/t6040-pmgr-preserve-active.patch 2>/dev/null; then
+        git apply /out/t6040-pmgr-preserve-active.patch
+        echo "t6040-pmgr-preserve-active.patch applied OK"
+    else
+        echo "ERROR: t6040-pmgr-preserve-active.patch does not apply cleanly:"
+        git apply --check /out/t6040-pmgr-preserve-active.patch || true
+        exit 1
+    fi
+
+fi
+
+if [ "${PMGR_FUNCTIONAL:-0}" = "1" ]; then
+    echo "== apply minimal T6040 PMGR functional policy =="
+    if grep -q 'skipping unsupported auto-enable' drivers/pmdomain/apple/pmgr-pwrstate.c; then
+        echo "t6040-pmgr-functional.patch already applied"
+    elif git apply --check /out/t6040-pmgr-functional.patch 2>/dev/null; then
+        git apply /out/t6040-pmgr-functional.patch
+        echo "t6040-pmgr-functional.patch applied OK"
+    else
+        echo "ERROR: t6040-pmgr-functional.patch does not apply cleanly:"
+        git apply --check /out/t6040-pmgr-functional.patch || true
+        exit 1
+    fi
 fi
 
 echo "== verify netfilter case-collision is healed in the clone =="

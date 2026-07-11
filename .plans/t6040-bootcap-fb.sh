@@ -35,6 +35,10 @@ M1=/dev/cu.usbmodemJ22GYCN4YG1
 OUT=/Users/damsleth/Code/linux-build-out
 cd /Users/damsleth/Code/m1n1
 
+# Use the repo venv python (has pyserial); fall back to python3 if absent.
+PY=/Users/damsleth/Code/m1n1/venv/bin/python
+[ -x "$PY" ] || PY=python3
+
 # Optional arg 1: DTB filename in $OUT (default our full j614s DT). Use
 # "t6040-j614s-min.dtb" to boot flokli's MINIMAL DT with the same kernel Image,
 # to isolate whether our fuller DT causes an early driver hang.
@@ -57,10 +61,11 @@ fi
 # the M4 WFI-state-loss. (Plain mainline ignores idle= on arm64, and nohlt too.)
 # EXTRA_BOOTARGS env var appends more (e.g. EXTRA_BOOTARGS=initcall_debug to trace
 # which initcall hangs; note it floods the console with deferred-probe retries).
-CMDLINE="maxcpus=1 idle=nop nokaslr pd_ignore_unused clk_ignore_unused console=tty0 ignore_loglevel${EXTRA_BOOTARGS:+ $EXTRA_BOOTARGS}"
+KERNEL_LOG_ARGS="${KERNEL_LOG_ARGS:-ignore_loglevel}"
+CMDLINE="maxcpus=1 idle=nop nokaslr pd_ignore_unused clk_ignore_unused console=tty0 $KERNEL_LOG_ARGS${EXTRA_BOOTARGS:+ $EXTRA_BOOTARGS}"
 
 echo "== chainload fresh m1n1 (dapf gate + watchdog auto-reset) =="
-M1N1DEVICE=$M1 timeout 60 python3 proxyclient/tools/chainload.py -r build/m1n1.bin 2>&1 \
+M1N1DEVICE=$M1 timeout 60 "$PY" proxyclient/tools/chainload.py -r build/m1n1.bin 2>&1 \
     | grep -iE "Running proxy" | head
 
 echo
@@ -75,7 +80,7 @@ echo
 
 echo "== boot kernel (linux.py raises UartTimeout at handoff; that is expected) =="
 BOOTLOG="$OUT/linuxpy-boot.log"
-M1N1DEVICE=$M1 timeout 90 python3 proxyclient/tools/linux.py \
+M1N1DEVICE=$M1 timeout 90 "$PY" proxyclient/tools/linux.py \
     "$OUT/Image" "$OUT/$DTB" ${INITRAMFS:+"$OUT/$INITRAMFS"} --compression none \
     -b "$CMDLINE$RDINIT" 2>&1 | tee "$BOOTLOG" | tail -12 || true
 
