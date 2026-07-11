@@ -55,7 +55,9 @@ fi
 # idle=nop is now FUNCTIONAL: flokli's idle.c patch (applied in t6040-kbuild.sh)
 # adds the arm64 idle= early_param and skips wfi()/wfit() when idle=nop, avoiding
 # the M4 WFI-state-loss. (Plain mainline ignores idle= on arm64, and nohlt too.)
-CMDLINE="maxcpus=1 idle=nop nokaslr pd_ignore_unused clk_ignore_unused console=tty0 ignore_loglevel"
+# EXTRA_BOOTARGS env var appends more (e.g. EXTRA_BOOTARGS=initcall_debug to trace
+# which initcall hangs; note it floods the console with deferred-probe retries).
+CMDLINE="maxcpus=1 idle=nop nokaslr pd_ignore_unused clk_ignore_unused console=tty0 ignore_loglevel${EXTRA_BOOTARGS:+ $EXTRA_BOOTARGS}"
 
 echo "== chainload fresh m1n1 (dapf gate + watchdog auto-reset) =="
 M1N1DEVICE=$M1 timeout 60 python3 proxyclient/tools/chainload.py -r build/m1n1.bin 2>&1 \
@@ -77,17 +79,7 @@ M1N1DEVICE=$M1 timeout 90 python3 proxyclient/tools/linux.py \
     "$OUT/Image" "$OUT/$DTB" ${INITRAMFS:+"$OUT/$INITRAMFS"} --compression none \
     -b "$CMDLINE$RDINIT" 2>&1 | tee "$BOOTLOG" | tail -12 || true
 
-# Persist Kernel_base for the RAM-dump fallback (t6040-ramdump.py needs it).
-KBASE=$(grep -oiE "Kernel_base: 0x[0-9a-f]+" "$BOOTLOG" | grep -oiE "0x[0-9a-f]+" | tail -1)
-echo "${KBASE:-}" > "$OUT/kernel_base.txt"
-
 echo
-echo "== handoff done. Watch the laptop screen. =="
-if [ -n "${KBASE:-}" ]; then
-  echo "   Kernel_base = $KBASE  (saved to $OUT/kernel_base.txt)"
-  echo "   If the screen stayed blank, wait for the watchdog to warm-reset to"
-  echo "   'Running proxy' (~20s), then dump the kernel log from RAM:"
-  echo "     M1N1DEVICE=$M1 python3 .plans/t6040-ramdump.py $KBASE"
-else
-  echo "   WARN: could not parse Kernel_base from linux.py output ($BOOTLOG)."
-fi
+echo "== handoff done. Watch the laptop screen for the kernel/fbcon output. =="
+echo "   (No RAM-dump fallback: iBoot scrubs DRAM on the watchdog reset, so a"
+echo "    post-mortem __log_buf dump reads all-zero. On-screen fbcon is the console.)"
