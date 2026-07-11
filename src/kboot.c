@@ -2879,9 +2879,8 @@ int kboot_boot(void *kernel)
 
     usb_init();
     pcie_init();
-    // dapf_init_all() now gates the dart-aop/dart-isp filters off on M4-family
-    // SoCs (t6040/t8132), which are what raised the async L2C SError here; the
-    // dart-mtp/pmp filters still init. See src/dapf.c:m4_dapf_broken.
+    // dapf_init_all() gates off the DAPF filters that raise the async L2C SError
+    // on M4 SoCs (all of them on t6040, aop/isp on t8132). See src/dapf.c:dapf_skip_entry.
     dapf_init_all();
 
     printf("Setting SMP mode to WFE...\n");

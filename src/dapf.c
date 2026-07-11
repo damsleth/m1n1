@@ -168,9 +168,9 @@ int dapf_init(const char *path, int index)
 struct entry {
     const char *path;
     int index;
-    // Initializing this DAPF's filter raises a fatal async L2C SError on M4-family
-    // SoCs (see m4_dapf_broken below). Skip it there.
-    bool m4_broken;
+    // On t8132 ("Neo" M4) initializing this DAPF raises the async L2C SError
+    // (yuka); on t6040 more of them do (see dapf_skip_entry).
+    bool t8132_broken;
 };
 
 struct entry dapf_entries[] = {
@@ -179,16 +179,23 @@ struct entry dapf_entries[] = {
     {"/arm-io/dart-isp0", 5, true}, {NULL, -1, false},
 };
 
-// On the M4 generation (t6040 M4 Pro, t8132 "Neo" M4) initializing the dart-aop
-// (and dart-isp) DAPF page-fault filters raises an imprecise async L2C
-// ACCESS_FAULT SError that kills m1n1 during kboot handoff (L2C_ERR_STS 0x82).
-// The dart-mtp/dart-pmp filters init fine and mtp needs them (without dapf the
-// mtp only comes up with iommu.passthrough=1). Empirically found by yuka on
-// t8132 and confirmed on t6040; there is no clean ADT signal for it, so gate on
-// chip_id. Revisit if the aop/isp filters are ever needed on these SoCs.
-static bool m4_dapf_broken(void)
+// Initializing certain DAPF (DART page-fault filter) MMIO on the M4 generation
+// raises an imprecise async L2C ACCESS_FAULT SError (L2C_ERR_STS 0x82) that kills
+// m1n1 at kboot handoff. Which DARTs trigger it differs per SoC and there is no
+// clean ADT signal, so gate on chip_id:
+//   t8132 "Neo": only dart-aop/dart-isp SError; dart-mtp/pmp init fine and mtp
+//     needs them (yuka).
+//   t6040 M4 Pro: dart-mtp ALSO SErrors (confirmed on HW 2026-07-11 — skipping
+//     only aop/isp was not enough, the same SError recurred right after
+//     "Initialized dart-mtp"). We don't need any of these DARTs for a headless
+//     bring-up boot, so skip the whole set here pending proper RE.
+static bool dapf_skip_entry(const struct entry *e)
 {
-    return chip_id == T6040 || chip_id == T8132;
+    if (chip_id == T6040)
+        return true;
+    if (chip_id == T8132)
+        return e->t8132_broken;
+    return false;
 }
 
 int dapf_init_all(void)
@@ -196,15 +203,14 @@ int dapf_init_all(void)
     int ret = 0;
     int count = 0;
     struct entry *entry = dapf_entries;
-    bool skip_broken = m4_dapf_broken();
 
     while (entry->path != NULL) {
         if (adt_path_offset(adt, entry->path) < 0) {
             entry++;
             continue;
         }
-        if (entry->m4_broken && skip_broken) {
-            printf("dapf: Skipping %s (async L2C SError on M4-family SoCs)\n", entry->path);
+        if (dapf_skip_entry(entry)) {
+            printf("dapf: Skipping %s (async L2C SError on this M4 SoC)\n", entry->path);
             entry++;
             continue;
         }
