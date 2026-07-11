@@ -59,6 +59,12 @@ Next priority order:
    `.plans/t6040-dockchannel-fixes.patch`, applied by kbuild.sh).
 4. Move from the proof initramfs to a fuller initramfs/rootfs, then NVMe.
 
+TODO (quick, next boot): verify the trackpad delivers events — at the BusyBox
+shell run `cat /dev/input/event0 | hexdump | head` and swipe on the trackpad
+(keyboard is likely event1; if event0 shows nothing, try
+`cat /dev/input/event1 | hexdump | head`). Registered devices:
+input0 = Apple DockChannel Multi-touch, input1 = Apple DockChannel Keyboard.
+
 ## How to boot it RIGHT NOW
 
 The M4 is tethered over USB (`/dev/cu.usbmodemJ22GYCN4YG1` = proxy, `...YG3` = vuart
