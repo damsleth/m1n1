@@ -32,6 +32,30 @@ cp /src/$APPLE/t6040-j614s.dts   $APPLE/
 cp /src/$APPLE/t6040-pmgr.dtsi   $APPLE/
 cp /src/$APPLE/Makefile          $APPLE/
 
+echo "== apply flokli's t6040 CODE patches (aic locked-sysreg skip + idle=nop) =="
+# CRITICAL: the build checks out COMMITTED code and only copies in DT files, so any
+# uncommitted code edits on the host (e.g. the irq-apple-aic.c hyp-mode sysreg
+# comment-out) are NOT in the build. Apply flokli's proven t6040 bring-up code
+# patches here so they actually land. Patch disables BOTH the
+# SYS_IMP_APL_VM_TMR_FIQ_ENA_EL2 and SYS_ICH_HCR_EL2 writes in aic_init_cpu (they
+# trap on M4 raw-boot) and adds a working arm64 idle=[wfi|nop] param.
+if git apply --check /out/flokli-code.patch 2>/dev/null; then
+    git apply /out/flokli-code.patch
+    echo "flokli-code.patch applied OK"
+else
+    echo "ERROR: flokli-code.patch does not apply cleanly to this tree:"
+    git apply --check /out/flokli-code.patch || true
+    echo "-- current aic_init_cpu hyp block (adapt the patch to match) --"
+    sed -n '/EL2-only (VHE mode)/,/PMC FIQ/p' drivers/irqchip/irq-apple-aic.c
+    exit 1
+fi
+echo "-- verify the two traps are gone from aic_init_cpu --"
+if sed -n '/static int aic_init_cpu/,/PMC FIQ/p' drivers/irqchip/irq-apple-aic.c | grep -qE "^\s*sysreg_clear_set_s\(SYS_(IMP_APL_VM_TMR_FIQ_ENA|ICH_HCR)_EL2"; then
+    echo "WARN: a locked-sysreg write is still active in aic_init_cpu!"
+else
+    echo "aic_init_cpu locked-sysreg writes disabled OK"
+fi
+
 echo "== verify netfilter case-collision is healed in the clone =="
 git status --short include/uapi/linux/netfilter/xt_mark.h || true
 

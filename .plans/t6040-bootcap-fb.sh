@@ -35,7 +35,27 @@ M1=/dev/cu.usbmodemJ22GYCN4YG1
 OUT=/Users/damsleth/Code/linux-build-out
 cd /Users/damsleth/Code/m1n1
 
-CMDLINE="maxcpus=1 nohlt nokaslr pd_ignore_unused clk_ignore_unused console=tty0 ignore_loglevel"
+# Optional arg 1: DTB filename in $OUT (default our full j614s DT). Use
+# "t6040-j614s-min.dtb" to boot flokli's MINIMAL DT with the same kernel Image,
+# to isolate whether our fuller DT causes an early driver hang.
+DTB="${1:-t6040-j614s.dtb}"
+echo "== using DTB: $DTB =="
+
+# Optional arg 2: initramfs filename in $OUT (e.g. "initramfs.cpio.gz"). With one,
+# the kernel gets a real rootfs and runs /init instead of panicking at VFS root
+# mount. NOTE: no keyboard driver in the minimal DT yet, so /init runs a scripted
+# proof-of-userspace (banner + uname + cpuinfo) rather than an interactive shell.
+INITRAMFS="${2:-}"
+RDINIT=""
+if [ -n "$INITRAMFS" ]; then
+  echo "== using initramfs: $INITRAMFS =="
+  RDINIT=" rdinit=/init"
+fi
+
+# idle=nop is now FUNCTIONAL: flokli's idle.c patch (applied in t6040-kbuild.sh)
+# adds the arm64 idle= early_param and skips wfi()/wfit() when idle=nop, avoiding
+# the M4 WFI-state-loss. (Plain mainline ignores idle= on arm64, and nohlt too.)
+CMDLINE="maxcpus=1 idle=nop nokaslr pd_ignore_unused clk_ignore_unused console=tty0 ignore_loglevel"
 
 echo "== chainload fresh m1n1 (dapf gate + watchdog auto-reset) =="
 M1N1DEVICE=$M1 timeout 60 python3 proxyclient/tools/chainload.py -r build/m1n1.bin 2>&1 \
@@ -52,11 +72,22 @@ echo "===================================================================="
 echo
 
 echo "== boot kernel (linux.py raises UartTimeout at handoff; that is expected) =="
+BOOTLOG="$OUT/linuxpy-boot.log"
 M1N1DEVICE=$M1 timeout 90 python3 proxyclient/tools/linux.py \
-    "$OUT/Image" "$OUT/t6040-j614s.dtb" --compression none \
-    -b "$CMDLINE" 2>&1 | tail -12 || true
+    "$OUT/Image" "$OUT/$DTB" ${INITRAMFS:+"$OUT/$INITRAMFS"} --compression none \
+    -b "$CMDLINE$RDINIT" 2>&1 | tee "$BOOTLOG" | tail -12 || true
+
+# Persist Kernel_base for the RAM-dump fallback (t6040-ramdump.py needs it).
+KBASE=$(grep -oiE "Kernel_base: 0x[0-9a-f]+" "$BOOTLOG" | grep -oiE "0x[0-9a-f]+" | tail -1)
+echo "${KBASE:-}" > "$OUT/kernel_base.txt"
 
 echo
-echo "== handoff done. Look at the screen. Kernel_base above = where the Image"
-echo "   was loaded (needed for a post-mortem __log_buf RAM dump if the screen"
-echo "   stays blank - see t6040-ramdump.py). =="
+echo "== handoff done. Watch the laptop screen. =="
+if [ -n "${KBASE:-}" ]; then
+  echo "   Kernel_base = $KBASE  (saved to $OUT/kernel_base.txt)"
+  echo "   If the screen stayed blank, wait for the watchdog to warm-reset to"
+  echo "   'Running proxy' (~20s), then dump the kernel log from RAM:"
+  echo "     M1N1DEVICE=$M1 python3 .plans/t6040-ramdump.py $KBASE"
+else
+  echo "   WARN: could not parse Kernel_base from linux.py output ($BOOTLOG)."
+fi

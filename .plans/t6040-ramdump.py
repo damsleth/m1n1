@@ -68,10 +68,35 @@ print("System.map: _text=0x%x __log_buf=%s -> offset 0x%x" %
       (text, ("0x%x" % logbuf) if logbuf else "n/a", off))
 print("reading %d bytes of phys RAM at 0x%x (nokaslr assumed)..." % (dump_len, phys))
 
-# Connect to the *running* stock m1n1 proxy (no reboot!).
-from m1n1.setup import *  # noqa: F401,F403  -> gives `iface`, `p`, `u`
+# Connect to the *running* m1n1 proxy with the MINIMAL bootstrap: just the
+# UartInterface + proxy handshake. Deliberately NOT `from m1n1.setup import *` —
+# that also builds ProxyUtils (heap allocs) and pokes the PMU, which we want to
+# avoid while reading untouched DRAM.
+from m1n1.proxy import UartInterface, M1N1Proxy
+from m1n1.proxyutils import bootstrap_port
 
-data = iface.readmem(phys, dump_len)  # noqa: F405
+iface = UartInterface()
+p = M1N1Proxy(iface, debug=False)
+bootstrap_port(iface, p)
+
+# DRAM-retention check: linux.py wrote the arm64 Image to kernel_base before boot.
+# If those bytes survived the watchdog/iBoot reset, DRAM is retained (and empty
+# __log_buf means the kernel didn't log). If they're zeros too, iBoot scrubbed
+# DRAM on reset and no post-mortem RAM dump can ever work here.
+hdr = iface.readmem(kernel_base, 64)
+magic = hdr[0x38:0x3C]
+nz = sum(1 for b in hdr if b)
+print("\n----- DRAM retention check @ kernel_base 0x%x -----" % kernel_base)
+print("first 64 bytes: %s" % hdr.hex())
+print("arm64 Image magic @0x38: %s (%s)" %
+      (magic.hex(), "PRESENT - DRAM retained, kernel just didn't log"
+       if magic == b"ARM\x64" else
+       "MISSING - %d/64 non-zero" % nz))
+print("verdict: %s\n" % ("DRAM RETAINED (fix the kernel hang / find real log buffer)"
+                         if magic == b"ARM\x64" or nz > 8 else
+                         "DRAM SCRUBBED on reset -> ramdump path is dead, use debugusb"))
+
+data = iface.readmem(phys, dump_len)
 with open(DUMP, "wb") as f:
     f.write(data)
 print("wrote %d bytes -> %s" % (len(data), DUMP))
