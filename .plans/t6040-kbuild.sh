@@ -188,6 +188,34 @@ if [ "${DOCKCHANNEL:-0}" = "1" ]; then
             -- drivers/mailbox/apple-dockchannel.c | git apply
         echo "DockChannel HID series applied OK"
     fi
+    # Local fix: add the missing hid_ll_driver .stop (NULL-deref oops on t6040,
+    # see .plans/t6040-dockchannel-fixes.patch; copy it to /out first).
+    if grep -q 'dchid_stop' \
+        drivers/hid/apple-dockchannel-hid/apple_dockchannel_hid.c; then
+        echo "t6040-dockchannel-fixes.patch already applied"
+    elif git apply --check /out/t6040-dockchannel-fixes.patch 2>/dev/null; then
+        git apply /out/t6040-dockchannel-fixes.patch
+        echo "t6040-dockchannel-fixes.patch applied OK"
+    else
+        echo "ERROR: t6040-dockchannel-fixes.patch does not apply cleanly:"
+        git apply --check /out/t6040-dockchannel-fixes.patch || true
+        exit 1
+    fi
+fi
+
+if [ "${DOCKCHANNEL_DEBUG:-0}" = "1" ]; then
+    echo "== apply T6040 MTP wake diagnostic patch =="
+    if grep -q 'MTPDBG before RUN' \
+        drivers/hid/apple-dockchannel-hid/apple_dockchannel_hid.c; then
+        echo "t6040-dockchannel-debug.patch already applied"
+    elif git apply --check /out/t6040-dockchannel-debug.patch 2>/dev/null; then
+        git apply /out/t6040-dockchannel-debug.patch
+        echo "t6040-dockchannel-debug.patch applied OK"
+    else
+        echo "ERROR: t6040-dockchannel-debug.patch does not apply cleanly:"
+        git apply --check /out/t6040-dockchannel-debug.patch || true
+        exit 1
+    fi
 fi
 
 echo "== verify netfilter case-collision is healed in the clone =="

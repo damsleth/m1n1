@@ -22,6 +22,13 @@ fi
 echo "--- MTP / DockChannel / DART / HID dmesg ---"
 /bin/busybox dmesg | /bin/busybox grep -Ei \
     'dock|mtp|dart|rtkit|hid|input|keyboard|watchdog' | /bin/busybox tail -100
+echo "--- MTP post-probe MMIO (read-only) ---"
+echo "CPU_CONTROL 0x514600044 = $(/bin/busybox devmem 0x514600044 32)"
+echo "CPU_STATUS  0x514600048 = $(/bin/busybox devmem 0x514600048 32)"
+echo "A2I_CONTROL 0x514608110 = $(/bin/busybox devmem 0x514608110 32)"
+echo "I2A_CONTROL 0x514608114 = $(/bin/busybox devmem 0x514608114 32)"
+echo "DART SID0   0x514801000 = $(/bin/busybox devmem 0x514801000 32)"
+echo "DART ERROR  0x514800100 = $(/bin/busybox devmem 0x514800100 32)"
 echo "--- /proc/bus/input/devices ---"
 /bin/busybox cat /proc/bus/input/devices 2>/dev/null
 echo "--- /dev/input ---"
