@@ -91,6 +91,24 @@ boot log up to wherever it dies.
    → reads the console out of RAM. If that's garbage, DRAM didn't survive the reset
    and the only remaining path is debugusb (DP-capable USB-C cable + kisd).
 
+## UPDATE (first on-HW test of this session)
+
+Ran `t6040-bootcap-fb.sh`. Two results:
+- **The framebuffer console WORKS** — m1n1's own EL2 exception dump rendered
+  clearly on the laptop display. The on-screen console path is proven; we just
+  didn't reach the kernel yet.
+- **My dapf diagnosis was wrong.** The gate correctly skipped dart-aop, but the
+  **identical** L2C SError still fired right after `dapf: Initialized dart-mtp`. So
+  on **t6040 dart-mtp also SErrors** (t8132 only needed aop/isp). Fixed:
+  `src/dapf.c:dapf_skip_entry` now skips **every** dapf entry on t6040 (the proven
+  clean-handoff path); t8132 still skips only aop/isp. m1n1 rebuilt.
+- linux.py threw `SerialException: Device not configured` — that's just the USB
+  gadget vanishing when m1n1 SError-rebooted (not the normal handoff timeout). With
+  dapf fully skipped m1n1 should now hand off cleanly instead of crashing.
+
+Next: re-run `t6040-bootcap-fb.sh` with the rebuilt m1n1 → expect a clean handoff,
+then watch the screen for the KERNEL's fbcon output.
+
 ## References / open items
 - flokli owns the t6040 (J773s); m1n1 **PR #597** = initial T6040 support + a
   minimal DT booting maxcpus=1. Worth diffing our tree against it.
