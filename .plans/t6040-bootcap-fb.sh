@@ -45,6 +45,11 @@ PY=/Users/damsleth/Code/m1n1/venv/bin/python
 DTB="${1:-t6040-j614s.dtb}"
 echo "== using DTB: $DTB =="
 
+# Optional IMAGE env: kernel filename in $OUT (default the known-good Image).
+# e.g. IMAGE=Image-gadget for the USB gadget console kernel.
+IMAGE="${IMAGE:-Image}"
+echo "== using kernel: $IMAGE =="
+
 # Optional arg 2: initramfs filename in $OUT (e.g. "initramfs.cpio.gz"). With one,
 # the kernel gets a real rootfs and runs /init instead of panicking at VFS root
 # mount. NOTE: no keyboard driver in the minimal DT yet, so /init runs a scripted
@@ -62,7 +67,9 @@ fi
 # EXTRA_BOOTARGS env var appends more (e.g. EXTRA_BOOTARGS=initcall_debug to trace
 # which initcall hangs; note it floods the console with deferred-probe retries).
 KERNEL_LOG_ARGS="${KERNEL_LOG_ARGS:-ignore_loglevel}"
-CMDLINE="maxcpus=1 idle=nop nokaslr pd_ignore_unused clk_ignore_unused console=tty0 $KERNEL_LOG_ARGS${EXTRA_BOOTARGS:+ $EXTRA_BOOTARGS}"
+# fbcon=font:TER16x32 doubles the console text size on the 3024x1964 panel
+# (needs CONFIG_FONT_TER16x32; kernels without it fall back to the 8x16 font).
+CMDLINE="maxcpus=1 idle=nop nokaslr pd_ignore_unused clk_ignore_unused console=tty0 fbcon=font:TER16x32 $KERNEL_LOG_ARGS${EXTRA_BOOTARGS:+ $EXTRA_BOOTARGS}"
 
 echo "== chainload fresh m1n1 (dapf gate + watchdog auto-reset) =="
 M1N1DEVICE=$M1 timeout 60 "$PY" proxyclient/tools/chainload.py -r build/m1n1.bin 2>&1 \
@@ -81,7 +88,7 @@ echo
 echo "== boot kernel (linux.py raises UartTimeout at handoff; that is expected) =="
 BOOTLOG="$OUT/linuxpy-boot.log"
 M1N1DEVICE=$M1 timeout 90 "$PY" proxyclient/tools/linux.py \
-    "$OUT/Image" "$OUT/$DTB" ${INITRAMFS:+"$OUT/$INITRAMFS"} --compression none \
+    "$OUT/$IMAGE" "$OUT/$DTB" ${INITRAMFS:+"$OUT/$INITRAMFS"} --compression none \
     -b "$CMDLINE$RDINIT" 2>&1 | tee "$BOOTLOG" | tail -12 || true
 
 echo

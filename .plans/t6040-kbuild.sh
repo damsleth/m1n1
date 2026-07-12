@@ -237,14 +237,39 @@ echo "   display. Mirrors mischa85's t6041 baremetal boot-to-userspace recipe. =
     -e FB -e VT -e VT_CONSOLE \
     -e FRAMEBUFFER_CONSOLE -e FRAMEBUFFER_CONSOLE_DETECT_PRIMARY \
     -e LOGO -e WATCHDOG -e APPLE_WATCHDOG \
+    -e FONTS \
     -d ARM64_SME
+# Terminus 16x32: double-size console text for the 3024x1964 panel (boot with
+# fbcon=font:TER16x32). scripts/config uppercases symbol names, so sed directly.
+if grep -q "CONFIG_FONT_TER16x32" .config; then
+    sed -i 's|# CONFIG_FONT_TER16x32 is not set|CONFIG_FONT_TER16x32=y|' .config
+else
+    echo "CONFIG_FONT_TER16x32=y" >> .config
+fi
 if [ "${DOCKCHANNEL:-0}" = "1" ]; then
     ./scripts/config --file .config \
         -e APPLE_MAILBOX -e APPLE_RTKIT -e APPLE_DART \
         -e HID -e HID_APPLE -e APPLE_DOCKCHANNEL \
         -e APPLE_DOCKCHANNEL_HID
 fi
+if [ "${GADGET:-0}" = "1" ]; then
+    # USB gadget console: plain dwc3 core in peripheral mode (snps,dwc3 DT
+    # nodes; the PHY stays as m1n1 configured it) + configfs ACM function.
+    # No legacy USB_G_SERIAL: the initramfs builds one gadget per UDC via
+    # configfs so whichever port has the tether cable enumerates.
+    # NCM/ECM: macOS's ACM driver (AppleUSBCDCComposite) fails to publish
+    # interfaces even though the gadget reaches "configured" (verified on HW
+    # 2026-07-12); its NCM support is modern and works. Ship both + ACM.
+    ./scripts/config --file .config \
+        -e USB_SUPPORT -e USB_GADGET -e USB_DWC3 -e USB_DWC3_GADGET \
+        -e USB_CONFIGFS -e USB_CONFIGFS_ACM -e U_SERIAL_CONSOLE \
+        -e USB_CONFIGFS_NCM -e USB_CONFIGFS_ECM
+fi
 make ARCH=arm64 olddefconfig >/dev/null
+if [ "${GADGET:-0}" = "1" ]; then
+    echo "-- resulting gadget-relevant config --"
+    grep -E "CONFIG_(USB_DWC3|USB_DWC3_GADGET|USB_CONFIGFS|USB_CONFIGFS_ACM)=" .config || true
+fi
 echo "-- resulting fbcon-relevant config --"
 grep -E "CONFIG_(DRM_SIMPLEDRM|DRM_FBDEV_EMULATION|FRAMEBUFFER_CONSOLE|ARM64_SME)=" .config || true
 grep -E "CONFIG_(WATCHDOG|APPLE_WATCHDOG)=" .config || true
