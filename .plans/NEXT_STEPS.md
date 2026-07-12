@@ -1,5 +1,54 @@
 # t6040 (M4 Pro) Linux bring-up — NEXT STEPS / handoff
 
+## DONE (2026-07-12): two-way console/proxy over DebugUSB (KIS) 🎉
+
+**The early-boot console exists.** Full two-way m1n1 proxy + console over the
+DP/TB cable in the DFU port, via **DebugUSB/KIS** (NOT SBU analog serial —
+see dead-ends below). Verified: p.nop(), ADT fetch, memory reads, and a full
+boot-log capture that includes iBoot stage markers (iBoot's own output is
+hash-redacted by production fuses; m1n1's is plaintext).
+
+**How to (re)establish:** `bash .plans/t6040-debugusb-console.sh [reboot]`
+- Host side: `sudo macvdmtool [reboot] debugusb` (root-owned copy at
+  /usr/local/bin/macvdmtool, NOPASSWD sudoers entry, patched source at
+  ~/Code/macvdmtool with new cmds: actions/vdm/dven/localserial).
+- Host daemon: `~/Code/kisd` (AsahiLinux/kisd, builds & runs on macOS as-is).
+  It auto-detects the t6040 KIS base 0x548700000; allocates a pty (printed in
+  its log; /dev/m1n1 symlink fails under SIP). kisd uart channel 0 == the
+  dock-side of the AP `/arm-io/dockchannel-uart` (AP data block 0x50882c000
+  + 0x40004000 = 0x548830000; same +0x40004000 offset holds on t8140).
+- Client: `M1N1DEVICE=<pty> python proxyclient/tools/...` — proxy.py has a
+  LOCAL UNCOMMITTED patch (Serial: raw pty termios + tolerate baud ioctl
+  failure) required for ptys; without it replies get mangled by termios.
+- GOTCHA: DebugUSB replaces m1n1's dwc3 gadget on the DFU port (no
+  /dev/cu.usbmodem* while active). For fast chainload, put the plain cable
+  in ANOTHER target port; DebugUSB console coexists with it.
+
+**SBU analog serial is a DEAD END on M4 (do not retry):** ACE3 (sn2012027)
+advertises action 0x306 (Get Action List works — new `macvdmtool actions`)
+but REJECTS every enter attempt: host VDM → BUSY reply 0x40030004; target-
+side DVEn via SPMI (nub-spmi-a0/hpm0, slave 0xc, unlock key = reversed
+target-type "416J", PR #594 protocol reimplemented live in
+scratchpad/target_serial_entry.py) → result 0x3 for pin sets 2/7; pin set 0
+(0x1810306) is ACCEPTED but no data flows (no HW drain to SBU); pin set 1
+(0x1820306) maps UART onto USB D+/D- and KILLS the USB proxy (m1n1 gadget
+does not re-enumerate — reboot needed). Action-info for 0306 =
+0x0187020c 0x800c0000. The dockchannel FIFO's real consumer is the KIS
+debug agent, hence DebugUSB is the supported path.
+
+**NEXT: Linux console on dockchannel UART** (host side now proven):
+Import from `origin/dockchannel`: `d2acb86f70a2` (mailbox: apple: DockChannel
+FIFO controller) + `b8dcbdcb` (tty: apple: DockChannel serial test driver,
+/dev/ttydcN) and use `e46443b` (t8140 J700 DT nodes) as the template —
+NOTE: kbuild.sh's DOCKCHANNEL block does NOT currently import these.
+t6040 node data from ADT `/arm-io/dockchannel-uart`: reg[0] 0x308828000
+(+0x200000000 live) size 0x10004 (config@+0, data@+0x4000), reg[1]
+0x30880c000 size 24 (irq block), AIC irq 360, enable-sw-drain=1,
+max-aop-clk 288 MHz. Since the KIS agent drains the same FIFO, Linux writes
+to this dockchannel should appear in kisd as soon as the driver probes —
+add it as a second console= after console=tty0. Then: getty on /dev/ttydcN.
+
+
 Session 2026-07-11. Written to hand off to a fresh context. Companion docs:
 `.plans/2026-07-11-t6040-console-session.md`, memory files
 `t6040-stagec-boot-blocker`, `t6040-kernel-build-env`, `t6040-broken-wfi`,
