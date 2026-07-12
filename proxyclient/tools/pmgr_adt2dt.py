@@ -11,6 +11,14 @@ from m1n1.utils import align_up
 
 parser = argparse.ArgumentParser(description='Convert ADT PMGR nodes to Device Tree format')
 parser.add_argument("-m", "--multidie", action="store_true")
+parser.add_argument(
+    "--always-on",
+    choices=("none", "critical"),
+    default="none",
+    help=("Linux always-on policy to emit (default: none). "
+          "'critical' preserves the legacy ADT-flag mapping for comparison, "
+          "but Apple critical flags are not Linux always-on policy."),
+)
 parser.add_argument('input', type=pathlib.Path)
 args = parser.parse_args()
 
@@ -19,7 +27,12 @@ dt = adt.load_adt(adt_data)
 
 pmgr = dt["/arm-io/pmgr"]
 
-dev_by_id = {dt.pmgr_dev_get_id(dev): dev for dev in pmgr.devices}
+# no_ps devices have no power-state register and are not emitted below. They
+# may still appear in Apple's parent list (for example dispext_rail_v), so they
+# must not become dangling DT phandles.
+dev_by_id = {
+    dt.pmgr_dev_get_id(dev): dev for dev in pmgr.devices if not dev.flags.no_ps
+}
 
 blocks = {}
 maxaddr = {}
@@ -78,12 +91,16 @@ for i, ((base, size), devices) in enumerate(sorted(blocks.items())):
         print( "\t\t#power-domain-cells = <0>;")
         print( "\t\t#reset-cells = <0>;")
         print(f'\t\tlabel = {die_label(dev.name.lower())};')
-        if dev.flags.critical:
+        if args.always_on == "critical" and dev.flags.critical:
             print("\t\tapple,always-on;")
 
         if any(dt.pmgr_dev_get_parents(dev)):
-            domains = [f"<&{die_node('ps_'+dev_by_id[idx].name.lower())}>" for idx in dt.pmgr_dev_get_parents(dev) if idx]
-            print(f"\t\tpower-domains = {', '.join(domains)};")
+            domains = [
+                f"<&{die_node('ps_'+dev_by_id[idx].name.lower())}>"
+                for idx in dt.pmgr_dev_get_parents(dev) if idx in dev_by_id
+            ]
+            if domains:
+                print(f"\t\tpower-domains = {', '.join(domains)};")
 
         print( "\t};")
     print( "};")
