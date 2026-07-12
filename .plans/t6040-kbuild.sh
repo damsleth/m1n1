@@ -37,6 +37,9 @@ fi
 if [ -f /src/$APPLE/t6040-j614s-kbd-infra.dts ]; then
     cp /src/$APPLE/t6040-j614s-kbd-infra.dts $APPLE/
 fi
+if [ -f /src/$APPLE/t6040-j614s-dcuart.dts ]; then
+    cp /src/$APPLE/t6040-j614s-dcuart.dts $APPLE/
+fi
 cp /src/$APPLE/t6040-pmgr.dtsi   $APPLE/
 cp /src/$APPLE/Makefile          $APPLE/
 
@@ -188,6 +191,30 @@ if [ "${DOCKCHANNEL:-0}" = "1" ]; then
             -- drivers/mailbox/apple-dockchannel.c | git apply
         echo "DockChannel HID series applied OK"
     fi
+    # DockChannel serial TTY (/dev/ttydcN) — carries the AP dockchannel-uart
+    # byte stream; with a DebugUSB/KIS session active the host reads it via
+    # kisd uart channel 0. Separate commit later in origin/dockchannel.
+    if [ -f drivers/tty/apple_dockchannel_tty.c ]; then
+        echo "DockChannel serial TTY already applied"
+    else
+        git show --format=email --no-ext-diff \
+            b8dcbdcb9cbf1d18be7cf30c1f839a204b0aec33 | git apply
+        echo "DockChannel serial TTY applied OK"
+    fi
+    # Local fix: apple,poll-mode for the dockchannel mailbox — on t6040 the
+    # dockchannel-uart AIC line (ADT irq 360) never asserts (verified by
+    # scanning all 4096 AIC inputs with FIFO flags latched+unmasked), so the
+    # driver polls the FIFO like m1n1 and the KIS agent do.
+    if grep -q 'apple,poll-mode' drivers/mailbox/apple-dockchannel.c; then
+        echo "t6040-dockchannel-poll.patch already applied"
+    elif git apply --check /out/t6040-dockchannel-poll.patch 2>/dev/null; then
+        git apply /out/t6040-dockchannel-poll.patch
+        echo "t6040-dockchannel-poll.patch applied OK"
+    else
+        echo "ERROR: t6040-dockchannel-poll.patch does not apply cleanly:"
+        git apply --check /out/t6040-dockchannel-poll.patch || true
+        exit 1
+    fi
     # Local fix: add the missing hid_ll_driver .stop (NULL-deref oops on t6040,
     # see .plans/t6040-dockchannel-fixes.patch; copy it to /out first).
     if grep -q 'dchid_stop' \
@@ -250,7 +277,7 @@ if [ "${DOCKCHANNEL:-0}" = "1" ]; then
     ./scripts/config --file .config \
         -e APPLE_MAILBOX -e APPLE_RTKIT -e APPLE_DART \
         -e HID -e HID_APPLE -e APPLE_DOCKCHANNEL \
-        -e APPLE_DOCKCHANNEL_HID
+        -e APPLE_DOCKCHANNEL_HID -e APPLE_DOCKCHANNEL_TTY
 fi
 if [ "${GADGET:-0}" = "1" ]; then
     # USB gadget console: plain dwc3 core in peripheral mode (snps,dwc3 DT
@@ -289,6 +316,9 @@ if [ "${DOCKCHANNEL:-0}" = "1" ]; then
     make ARCH=arm64 -j"$NPROC" apple/t6040-j614s-kbd.dtb
     cp $APPLE/t6040-j614s-kbd.dtb /out/ \
         && echo "DTB -> /out/t6040-j614s-kbd.dtb"
+    make ARCH=arm64 -j"$NPROC" apple/t6040-j614s-dcuart.dtb
+    cp $APPLE/t6040-j614s-dcuart.dtb /out/ \
+        && echo "DTB -> /out/t6040-j614s-dcuart.dtb"
 fi
 
 if [ "${1:-}" = "image" ]; then

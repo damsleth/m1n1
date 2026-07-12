@@ -1,0 +1,164 @@
+--- a/drivers/mailbox/apple-dockchannel.c
++++ b/drivers/mailbox/apple-dockchannel.c
+@@ -20,9 +20,19 @@
+ #include <linux/platform_device.h>
+ #include <linux/spinlock.h>
+ #include <linux/unaligned.h>
++#include <linux/workqueue.h>
+ 
+ #define APPLE_DOCKCHANNEL_FIFO_SIZE	0x800
+ 
++/*
++ * Polled-mode period. On t6040 the ADT-declared AIC line for the
++ * dockchannel-uart FIFO never asserts (all 4096 AIC inputs were scanned with
++ * the FIFO irq flags latched and unmasked); both m1n1 and the KIS dock-side
++ * agent poll this FIFO. 5 ms against a 2 KiB FIFO is far more bandwidth than
++ * a debug console needs.
++ */
++#define APPLE_DOCKCHANNEL_POLL_MS	5
++
+ #define IRQ_MASK			0x0
+ #define IRQ_FLAG			0x4
+ 
+@@ -49,6 +59,10 @@
+ 	void __iomem *data_base;
+ 	int irq;
+ 
++	bool poll_mode;
++	bool poll_running;
++	struct delayed_work poll_work;
++
+ 	spinlock_t lock; /* protects IRQ mask and TX state */
+ 	u32 irq_mask;
+ 
+@@ -171,9 +185,11 @@
+ 	dc->tx_active = true;
+ 
+ 	apple_dockchannel_write_pending(dc);
+-	writel_relaxed(APPLE_DOCKCHANNEL_FIFO_SIZE,
+-		       dc->config_base + CONFIG_TX_THRESH);
+-	apple_dockchannel_irq_enable(dc, IRQ_TX);
++	if (!dc->poll_mode) {
++		writel_relaxed(APPLE_DOCKCHANNEL_FIFO_SIZE,
++			       dc->config_base + CONFIG_TX_THRESH);
++		apple_dockchannel_irq_enable(dc, IRQ_TX);
++	}
+ 
+ 	spin_unlock_irqrestore(&dc->lock, flags);
+ 
+@@ -191,10 +207,16 @@
+ 	 * granularity because UART-style DockChannel clients require it.
+ 	 */
+ 	writel_relaxed(1, dc->config_base + CONFIG_RX_THRESH);
+-	apple_dockchannel_irq_enable(dc, IRQ_RX);
++	if (!dc->poll_mode)
++		apple_dockchannel_irq_enable(dc, IRQ_RX);
+ 	spin_unlock_irqrestore(&dc->lock, flags);
+ 
+-	enable_irq(dc->irq);
++	if (dc->poll_mode) {
++		WRITE_ONCE(dc->poll_running, true);
++		schedule_delayed_work(&dc->poll_work, 1);
++	} else {
++		enable_irq(dc->irq);
++	}
+ 
+ 	return 0;
+ }
+@@ -204,7 +226,12 @@
+ 	struct apple_dockchannel *dc = chan->con_priv;
+ 	unsigned long flags;
+ 
+-	disable_irq(dc->irq);
++	if (dc->poll_mode) {
++		WRITE_ONCE(dc->poll_running, false);
++		cancel_delayed_work_sync(&dc->poll_work);
++	} else {
++		disable_irq(dc->irq);
++	}
+ 
+ 	spin_lock_irqsave(&dc->lock, flags);
+ 	apple_dockchannel_irq_disable(dc, IRQ_TX | IRQ_RX);
+@@ -292,6 +319,45 @@
+ 	return IRQ_HANDLED;
+ }
+ 
++static void apple_dockchannel_poll_work(struct work_struct *work)
++{
++	struct apple_dockchannel *dc = container_of(work, struct apple_dockchannel,
++						    poll_work.work);
++	unsigned long flags;
++	bool tx_done = false;
++
++	spin_lock_irqsave(&dc->lock, flags);
++	if (dc->tx_active && apple_dockchannel_tx_empty(dc)) {
++		dc->tx_active = false;
++		tx_done = true;
++	}
++	spin_unlock_irqrestore(&dc->lock, flags);
++
++	if (tx_done)
++		mbox_chan_txdone(&dc->chan, 0);
++
++	for (;;) {
++		struct apple_dockchannel_msg msg;
++		size_t avail;
++
++		avail = readl_relaxed(dc->data_base + DATA_RX_COUNT);
++		if (!avail)
++			break;
++
++		avail = min_t(size_t, avail, APPLE_DOCKCHANNEL_FIFO_SIZE);
++
++		apple_dockchannel_read(dc, dc->rx_buf, avail);
++
++		msg.data = dc->rx_buf;
++		msg.len = avail;
++		mbox_chan_received_data(&dc->chan, &msg);
++	}
++
++	if (READ_ONCE(dc->poll_running))
++		schedule_delayed_work(&dc->poll_work,
++				      msecs_to_jiffies(APPLE_DOCKCHANNEL_POLL_MS));
++}
++
+ static struct mbox_chan *
+ apple_dockchannel_of_xlate(struct mbox_controller *mbox,
+ 			   const struct of_phandle_args *spec)
+@@ -331,17 +397,26 @@
+ 	writel_relaxed(0, dc->irq_base + IRQ_MASK);
+ 	writel_relaxed(~0, dc->irq_base + IRQ_FLAG);
+ 
+-	dc->irq = platform_get_irq(pdev, 0);
+-	if (dc->irq < 0)
+-		return dc->irq;
+-
+-	ret = devm_request_threaded_irq(dev, dc->irq, apple_dockchannel_irq,
+-					apple_dockchannel_irq_thread, IRQF_ONESHOT,
+-					dev_name(dev), dc);
+-	if (ret)
+-		return dev_err_probe(dev, ret, "failed to request IRQ\n");
++	dc->poll_mode = of_property_read_bool(dev->of_node, "apple,poll-mode");
++	INIT_DELAYED_WORK(&dc->poll_work, apple_dockchannel_poll_work);
+ 
+-	disable_irq(dc->irq);
++	if (dc->poll_mode) {
++		dev_info(dev, "using polled mode (%d ms)\n",
++			 APPLE_DOCKCHANNEL_POLL_MS);
++	} else {
++		dc->irq = platform_get_irq(pdev, 0);
++		if (dc->irq < 0)
++			return dc->irq;
++
++		ret = devm_request_threaded_irq(dev, dc->irq,
++						apple_dockchannel_irq,
++						apple_dockchannel_irq_thread,
++						IRQF_ONESHOT, dev_name(dev), dc);
++		if (ret)
++			return dev_err_probe(dev, ret, "failed to request IRQ\n");
++
++		disable_irq(dc->irq);
++	}
+ 
+ 	dc->chan.con_priv = dc;
+ 	dc->controller.dev = dev;

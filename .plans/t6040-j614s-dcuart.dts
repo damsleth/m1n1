@@ -1,0 +1,91 @@
+// SPDX-License-Identifier: GPL-2.0+ OR MIT
+/*
+ * Apple MacBook Pro J614s DockChannel-UART bring-up variant.
+ *
+ * The known-good keyboard configuration (t6040-j614s-kbd.dts) plus the
+ * dockchannel-uart FIFO exposed as /dev/ttydc0. With a DebugUSB (KIS)
+ * session active on the DFU port, the host reads this stream in kisd.
+ *
+ * Self-contained: the SoC dtsi carries no dockchannel-uart nodes, so the
+ * whole experiment lives here. Addresses/IRQ from the live J614s ADT
+ * /arm-io/dockchannel-uart: reg[0] = config@+0 / data@+0x4000, reg[1] =
+ * irq block (block base + 0xc000, same relative layout as t8140 J700).
+ *
+ * apple,poll-mode: the ADT-declared AIC line 360 never asserts on this
+ * machine — with the FIFO irq flags latched and unmasked, and all 4096
+ * AIC inputs unmasked, no AIC HW_STATE bit tracks the FIFO mask toggle
+ * (probed live via the m1n1 proxy, 2026-07-12). Both m1n1 and the KIS
+ * dock-side agent poll this FIFO; so must Linux.
+ */
+/dts-v1/;
+
+#include "t6040.dtsi"
+
+/ {
+	compatible = "apple,j614s", "apple,t6040", "apple,arm-platform";
+	model = "Apple MacBook Pro (M4 Pro) J614s [DockChannel UART bring-up]";
+
+	aliases {
+		keyboard = &mtp_keyboard;
+	};
+
+	chosen {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		framebuffer0: framebuffer@0 {
+			compatible = "apple,simple-framebuffer", "simple-framebuffer";
+			reg = <0 0 0 0>; /* To be filled by loader */
+			status = "disabled";
+		};
+	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+	};
+
+	memory@10000000000 {
+		device_type = "memory";
+		reg = <0x100 0 0x0 0>; /* To be filled by loader */
+	};
+};
+
+&soc {
+	dockchannel_uart: mailbox@50880c000 {
+		compatible = "apple,t8122-dockchannel",
+			     "apple,t8112-dockchannel";
+		reg = <0x5 0x0880c000 0x0 0x4000>,
+		      <0x5 0x08828000 0x0 0x4000>,
+		      <0x5 0x0882c000 0x0 0x4000>;
+		reg-names = "irq", "config", "data";
+		interrupt-parent = <&aic>;
+		interrupts = <AIC_IRQ 360 IRQ_TYPE_LEVEL_HIGH>;
+		apple,poll-mode;
+		#mbox-cells = <0>;
+	};
+
+	dockchannel_uart_serial: serial {
+		compatible = "apple,dockchannel-serial";
+		mboxes = <&dockchannel_uart>;
+		mbox-names = "dockchannel";
+	};
+};
+
+&mtp_mbox {
+	status = "okay";
+};
+
+&mtp_dart {
+	status = "okay";
+};
+
+&mtp_dockchannel {
+	status = "okay";
+};
+
+&mtp_hid {
+	status = "okay";
+};

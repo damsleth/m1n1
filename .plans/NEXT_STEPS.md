@@ -36,17 +36,79 @@ does not re-enumerate — reboot needed). Action-info for 0306 =
 0x0187020c 0x800c0000. The dockchannel FIFO's real consumer is the KIS
 debug agent, hence DebugUSB is the supported path.
 
-**NEXT: Linux console on dockchannel UART** (host side now proven):
-Import from `origin/dockchannel`: `d2acb86f70a2` (mailbox: apple: DockChannel
-FIFO controller) + `b8dcbdcb` (tty: apple: DockChannel serial test driver,
-/dev/ttydcN) and use `e46443b` (t8140 J700 DT nodes) as the template —
-NOTE: kbuild.sh's DOCKCHANNEL block does NOT currently import these.
-t6040 node data from ADT `/arm-io/dockchannel-uart`: reg[0] 0x308828000
-(+0x200000000 live) size 0x10004 (config@+0, data@+0x4000), reg[1]
-0x30880c000 size 24 (irq block), AIC irq 360, enable-sw-drain=1,
-max-aop-clk 288 MHz. Since the KIS agent drains the same FIFO, Linux writes
-to this dockchannel should appear in kisd as soon as the driver probes —
-add it as a second console= after console=tty0. Then: getty on /dev/ttydcN.
+## DONE (2026-07-12): two-way LINUX shell over DebugUSB (/dev/ttydc0) 🎉
+
+The full autonomous loop now works with ZERO screen-reading or manual typing:
+reboot + chainload + boot Linux + interactive busybox shell, all over the one
+DP/TB cable in the DFU port. Verified end-to-end: commands typed into the kisd
+pty execute in Linux userspace and stream results back (`dmesg`, multi-KB
+output, /proc reads). Keyboard/trackpad (event0/1) still work in the same DT.
+
+**How to boot it:** target at m1n1 "Running proxy" with kisd attached →
+`bash .plans/t6040-boot-dcuart.sh` (defaults: t6040-j614s-dcuart.dtb +
+initramfs-dcuart.cpio.gz). It chainloads build/m1n1.bin, uploads via the pty,
+hands off, then attaches a reader: console log tails to
+`~/Code/linux-build-out/dcuart-console.log`; type with `printf 'cmd\n' >
+/tmp/m1n1`. Full cycle from installed m1n1: `bash
+.plans/t6040-debugusb-console.sh reboot` first (target boots to "Running
+proxy" in <20 s).
+
+Kernel side (all applied by kbuild.sh DOCKCHANNEL=1, BUILD_DIR=/build/linux-keyboard):
+- imports `d2acb86f70a2` (mailbox) + `b8dcbdcb` (tty /dev/ttydcN) + HID series
+  from `origin/dockchannel`; config gains APPLE_DOCKCHANNEL_TTY=y.
+- `.plans/t6040-dockchannel-poll.patch` (copy to /out): adds `apple,poll-mode`
+  to the mailbox driver — **the ADT-declared AIC irq 360 NEVER fires on t6040**
+  (probed live from m1n1: FIFO irq flags latch and unmask fine at +0xc000, but
+  no bit among all 4096 unmasked AIC HW_STATE inputs tracks the FIFO mask
+  toggle). m1n1 and the KIS agent poll this FIFO; so does Linux now (5 ms
+  delayed-work: TX-done when FIFO drains, RX via RX_COUNT). Without the patch
+  TX stalls at EXACTLY one 2 KiB FIFO fill (send_data completes only via IRQ)
+  and RX is dead — the "banner then silence" signature.
+- DT: `.plans/t6040-j614s-dcuart.dts` (also untracked in the linux tree) =
+  kbd variant + self-contained dockchannel_uart nodes under &soc (irq block
+  0x50880c000 = block base + 0xc000, config 0x508828000, data 0x50882c000 —
+  same relative layout as yuka's t8140 J700). Built by explicit dtb target;
+  not in the apple/ Makefile.
+- initramfs: `.plans/t6040-init-dcuart` (make with t6040-make-initramfs.sh,
+  INIT_SOURCE=.plans/t6040-init-dcuart DEST=.../initramfs-dcuart.cpio.gz).
+  Holds fd 9 open on ttydc0 forever, prints "[dcuart] spawning shell" marker,
+  respawns `busybox sh -i <>/dev/ttydc0` via setsid.
+
+Known-good artifact hashes (Image is kernel build #11):
+- Image `3f2eab6dc3c46e0df19e954f026865d3203acb03c73cbe608edb9001f35fd867`
+- t6040-j614s-dcuart.dtb `f3f595dab17a1e536540ac8c82ed2b25442bfd37491137fdad9ef0190415cde8`
+- initramfs-dcuart.cpio.gz `512c69da94884f3ea83f9a6a4ea0731dcad6b5aaa87eb875ca5a6d7b24c317ca`
+
+**OPERATIONAL RULES for the DebugUSB link (hard-won, do not skip):**
+1. **A reader must be attached to the kisd pty at (almost) all times.** With
+   nobody reading, ~15 KB of boot output fills the pty buffer, kisd blocks,
+   and the KIS stream wedges into an apparently one-way link (writes ACK at
+   USB level, nothing returns). Recovery: `pkill kisd`, restart it, re-enter
+   `sudo -n macvdmtool debugusb`, attach `cat` immediately.
+2. **Never leave a `cat` running while a proxyclient tool uses the pty** — it
+   steals reply bytes. Sequence: kill reader → run tool → reattach reader.
+3. **First proxy attempt after boot often hits UartCMDError (desync from
+   leftover console bytes). Just retry** — second attempt succeeds.
+4. Boot (reboot → "Running proxy") takes <20 s. Poll every 2-3 s; don't wait
+   minutes.
+5. The dockchannel-uart block maps ONLY +0xc000 (24 B irq) and
+   +0x28000..+0x38004. Reading other offsets (e.g. +0x20000) = async SError
+   crash (L2C_ERR_ADR shows it; m1n1 dies). Unlike dockchannel-mtp, which
+   maps +0x0/+0x14000/+0x28000../+0x30000..
+6. `t6040-boot-dcuart.sh` runs linux.py with stdin not a tty → miniterm
+   traceback AFTER handoff. Harmless; the kernel is already booting.
+
+Open question (nice-to-have, not blocking): where does the dockchannel-uart
+irq line actually go? Candidates: nowhere (chopped-die fuse-off), AOP, or
+routed only via the KIS agent. XNU's pe_serial dockchannel path may answer
+(enable-sw-drain=1 in ADT). Poll mode makes this moot for bring-up.
+
+Next steps on this console: `console=ttydc0` needs a real console driver
+registration in the tty driver (it registers none today — printk cannot
+target it); until then dmesg-over-shell covers post-userspace, fbcon covers
+early boot. For pmgr bisection visibility, consider a tiny earlycon/printk
+poller into the same FIFO (m1n1-style raw writes) — the FIFO regs are usable
+from the first kernel instruction.
 
 
 Session 2026-07-11. Written to hand off to a fresh context. Companion docs:
