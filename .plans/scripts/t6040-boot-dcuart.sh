@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Boot the t6040 kernel ENTIRELY over the DebugUSB (KIS) pty — no plain-cable
 # tether, no screen-reading. Requires an attached kisd session (run
-# .plans/t6040-debugusb-console.sh first; /tmp/m1n1 -> kisd pty).
+# .plans/scripts/t6040-debugusb-console.sh first; /tmp/m1n1 -> kisd pty).
 #
 # Flow:
 #   1. chainload fresh m1n1 over the pty (proxy protocol)

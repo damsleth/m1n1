@@ -18,12 +18,16 @@ the linked docs for depth (progressive disclosure).**
    it wedges the proxy and needs a power-cycle. Do **not** blind-probe unknown
    register offsets. Derive from the ADT; if you must probe, one guarded read at a
    time, ready to power-cycle. (Learned the hard way — see `src/AGENTS.md`.)
-4. **USB gadget is not hot-plug safe** — never suggest unplugging. To recover a
-   wedged proxy, the maintainer power-cycles the M4 (button → "Running proxy…");
-   the device node returns with the same name. Don't reboot the M4 without asking.
+4. **USB gadget is not hot-plug safe** — never suggest unplugging. Recovery no
+   longer needs a hand on the button: `bash
+   .plans/scripts/t6040-debugusb-console.sh reboot` warm-reboots the M4 over the
+   DebugUSB cable and re-attaches (→ "Running proxy…" in <20 s). Reboots for the
+   bring-up loop are fine; still coordinate if the machine might be in use.
 5. **Don't post anything externally** (GitHub, IRC/#asahi-dev). Draft only; the
    maintainer reviews and posts.
-6. If the proxy stops responding: **say so and stop.** Don't retry into a wedge.
+6. If the proxy stops responding: work the documented recovery first (pty-reader
+   discipline + kisd restart + remote reboot — DEVLOG "DebugUSB link" rules). If
+   that doesn't bring it back, **say so and stop** — don't retry into a wedge.
 
 ## Build & run loop (host = this M1 Mac)
 
@@ -37,14 +41,33 @@ Toolchain needs **rustup nightly** + LLVM — see `rust/AGENTS.md`. Chainloading
 fresh build makes `build/m1n1.elf` symbols valid against the live image
 (`runtime = u.base + elf_vaddr`).
 
+**DebugUSB transport (the default since 2026-07-12):** with a DP/TB cable in the
+DFU port, `bash .plans/scripts/t6040-debugusb-console.sh [reboot]` gives the same
+proxy on a kisd pty — `M1N1DEVICE=/tmp/m1n1` — plus remote reboot, with no plain
+tether needed. It replaces m1n1's USB gadget on that port (no `/dev/cu.usbmodem*`
+while active). **Read the pty-discipline rules in `.plans/DEVLOG.md` first** —
+mis-handling the pty makes the link look dead.
+
+**Linux boot loop:** `bash .plans/scripts/t6040-boot-dcuart.sh` chainloads m1n1
+and boots the kernel to a two-way BusyBox shell on `/dev/ttydc0` over the same
+cable (console log + `printf 'cmd\n' > /tmp/m1n1`). Kernel builds run in the
+`kbuild` podman container via `.plans/scripts/t6040-kbuild.sh` — recipes in
+`.plans/DEVLOG.md`.
+
 ## Where the knowledge lives (don't re-derive it)
 
-- `.plans/roadmap.md` — **current state**: what works, what doesn't, what's next.
-- `.plans/*-plan.md` — detailed active plans (cpufreq, mcc, …) with hardware-verified findings. `.plans/done/` = finished.
-- `.plans/*-session.log` — raw proxy session transcripts (evidence).
+- `.plans/NEXT_STEPS.md` — **the handoff doc**: what to do next, nothing else.
+- `.plans/DEVLOG.md` — operational reference: boot/build recipes, DebugUSB link
+  rules, solved blockers, investigation history, dead ends.
+- `.plans/roadmap.md` — the long game (stages A–H), current snapshot.
+- `.plans/done/` — finished per-topic plans, session write-ups, drafts.
+- `.plans/scripts/` — the live harnesses (debugusb-console, boot-dcuart,
+  bootcap-fb, kbuild, make-initramfs, init-dcuart).
+- `.plans/patches/` + `.plans/dts/` — kernel patches and the dcuart board DT the
+  kbuild container applies (copy to `~/Code/linux-build-out/` before building).
 - `proxyclient/AGENTS.md` — how to talk to the M4 (connect, run code, safe probing).
 - `src/AGENTS.md` — m1n1 firmware C: T6040 chip constants, per-driver status & gotchas.
-- Host-local agent memory (not committed): `~/.claude/projects/-Users-damsleth-Code-m1n1/memory/` — SMP topology, broken_wfi, build toolchain. Verify facts still hold before acting on them.
+- Host-local agent memory (not committed): `~/.claude/projects/-Users-damsleth-Code-m1n1/memory/` — SMP topology, broken_wfi, build toolchain, DebugUSB console. Verify facts still hold before acting on them.
 
 ## Local fork deltas vs upstream
 
@@ -53,3 +76,10 @@ fresh build makes `build/m1n1.elf` symbols valid against the live image
   `src/smp.c`). Proxyclient `CPUFeatures` parses it. Keep this — do not "clean it up".
 - Chicken-bit init fns are **NULL on M4 by design** (raw-boot locks Apple sysregs;
   writing them traps). Leave them NULL.
+- `src/dapf.c` gates DAPF init per SoC (all t6040 entries trap → async L2C SError
+  at kboot handoff); `src/kboot.c` arms WD1 for ~20 s on M4 before handoff
+  (`src/wdt.c: wdt_arm_secs`) so hung kernels warm-reset to "Running proxy".
+- `proxyclient/m1n1/proxy.py` supports pty devices (raw termios, tolerant baud
+  ioctl) — required for the kisd DebugUSB bridge.
+- The curated, upstream-shaped code-only series lives on branch `t6040-bringup`
+  (worktree `~/Code/m1n1-clean`); keep it in sync with src/ changes on main.

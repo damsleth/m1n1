@@ -4,62 +4,50 @@ End-goal: a bootable Linux distro on this MacBook Pro 16" M4 Pro with GPU accel,
 WiFi, Bluetooth, keyboard/trackpad, audio, webcam, power management — daily-driver
 comfort comparable to macOS.
 
-Written 2026-07-10, last updated 2026-07-10 (post-SMP session). Companion docs:
-`2026-07-10-t6040-cpufreq-plan.md` (Stage B first item — the next step, detailed),
-`t6040-dt-checklist.md` (Stage C prep). Finished plans/logs archived in `done/`:
-Stage A bring-up plan, first-light session (2026-07-09), SMP session log (2026-07-10).
-Next step detailed in `2026-07-10-t6040-mcc-plan.md`. Unposted #asahi-dev drafts
-awaiting review: `2026-07-10-t6040-smp-writeup.md`, `2026-07-10-t6040-cpufreq-writeup.md`.
+Written 2026-07-10, last updated **2026-07-12** (post DockChannel-console
+session). Companion docs: `NEXT_STEPS.md` (immediate work), `DEVLOG.md`
+(operational reference + solved blockers), `t6040-dt-checklist.md` (Stage C
+reference). All finished per-topic plans/write-ups archived in `done/`.
+Unposted #asahi-dev drafts awaiting review: `done/2026-07-10-t6040-smp-writeup.md`,
+`done/2026-07-10-t6040-cpufreq-writeup.md`.
 
 ## Where we are
 
-**First light achieved 2026-07-09.** m1n1 v1.6.0+ boots via raw kmutil enrollment:
-fb console 3024x1964, AIC3 up, pmgr 485 devices, 3 USB DARTs, "Running proxy...".
+**Linux reaches userspace on bare metal (2026-07-11).** Mainline 7.2-rc2 + 3
+small patches boots to a BusyBox shell on the minimal DT (maxcpus=1, idle=nop),
+reproducibly. The internal keyboard works at that shell (dockchannel-HID,
+2026-07-11); the Linux watchdog takes over m1n1's (shell persists); the
+framebuffer (simpledrm+fbcon) is the early console.
 
-**Stage A complete 2026-07-10 — proxy solid, all 14 cores.** Verified this session
-over USB from the M1 host: chip-id 0x6040, `EARLY_UART_BASE`, and the last untested
-constant — `CPU_START_OFF_T6031` (0x88000) is **correct for Brava**. All 14 cores
-start and stay parked; execute-and-return proven via `smp_call_sync` on both an
-E-core and a P-core (uploaded leaf, on-target readback, deterministic returns).
-Per-core MPIDR mapped: E-cluster smp_id 0-3 (Aff2=0), P-cl0 smp_id 4-8 (Aff2=1
-Aff1=1, boot=4), P-cl1 smp_id 10-14 (Aff2=1 Aff1=2); smp_id 9 gap is Apple's
-non-contiguous ADT id on the P-cl0→P-cl1 boundary. 4E + 5P + 5P = 14.
+**Fully remote dev loop (2026-07-12).** Two-way m1n1 proxy AND a two-way Linux
+shell (`/dev/ttydc0`, poll-mode dockchannel driver — the ADT's AIC line never
+fires on this die) over a single DebugUSB/KIS cable in the DFU port, plus
+remote reboot via `macvdmtool`: reboot → chainload → boot → interactive shell
+with zero physical access. SBU analog serial was proven a dead end on ACE3.
 
-**broken_wfi resolved (local fork):** wfi/wfit lose architectural state on M4
-secondaries, so they park in `wfe` instead of `deep_wfi()`. Flag on `features_m4`
-+ proxyclient CPUFeatures parse; `broken_wfi=True, fast_ipi=True, actlr_el2=True,
-apple_sysregs_unlocked=False` confirmed live.
+**Stage A complete 2026-07-10** — proxy solid, 14/14 cores (4E+5P+5P), MPIDR
+map, execute-and-return, broken_wfi handled (WFE park), ~10 s chainload loop.
 
-**Dev loop live (2026-07-10):** local build chain fixed (rustup nightly + LLVM;
-see memory `m1n1-build-toolchain-m1host`), `make` → `chainload.py -r build/m1n1.bin`
-→ proxy works, ~seconds, kmutil retired. Freshly-built `m1n1.elf` symbols are valid
-against the running image once chainloaded (verified via RELATIVE-reloc byte-match).
-
-**Stage B item 1 — cpufreq: DONE (minimal), 2026-07-10.** `src/cpufreq.c` patched:
-T6040 reuses `t6031_clusters` (bases verified 3 ways); new `t6040_features` =
-{cpu-apsc, cpu-fixed-freq-pll-relock} only. `cpufreq_init()` returns 0, enables
-APSC (clusters → nominal pstate E5/P6), no more "unsupported". Detailed in
-`2026-07-10-t6040-cpufreq-plan.md`; writeup drafted.
-- **Deferred:** ppt/llc/amx-thrtl — the t6030 throttle offsets (0x40xxx) SError on
-  T6040 P-clusters; correct T6040 register map needs RE (open question to #asahi-dev).
+**Stage B effectively complete 2026-07-10** — cpufreq minimal (APSC/pstate;
+throttle offsets deferred, need RE), MCC t6041 Ph1+2 (TZ offset + cache-enable
+still open), PCIe Ph1 (two tunables left unapplied), ATC/USB DART audited
+(DART done, PHY tunables deferred → USB2 fallback), kboot FDT display carveout
+fixed, dapf gate + watchdog arm added for M4.
 
 ### Current working / not-working snapshot
 
 | Works | Not yet |
 |---|---|
-| Raw boot to proxy, EL2, fb 3024×1964, AIC3, pmgr (485 dev), USB DARTs | Linux boot (Stage B–C incomplete) |
-| SMP: 14/14 cores, execute-and-return, MPIDR map | MCC init + SLC/plane RE done (t6041, Ph1+2); TZ offset + cache-enable open (Stage C) |
-| broken_wfi handled (wfe park) | cpufreq throttles (offsets unknown) |
-| cpufreq pstate/APSC (minimal) | PCIe link-up (m1n1 t6040 branch in, Ph1; bring-up=Stage C), ATC, kboot FDT, DVFS tables |
-| Local build + chainload dev loop | hv/XNU tracing (SPTM-blocked on M4) |
+| BusyBox userspace on mainline+3 patches, reproducible | Full-pmgr DT hangs pre-console (ACTIVE blocker — NEXT_STEPS #2) |
+| Internal keyboard at the shell; trackpad registers (events untested) | maxcpus>1, idle states (WFI state-loss on M4) |
+| Two-way Linux shell + m1n1 proxy over one DebugUSB cable; remote reboot | `console=ttydc0` printk (tty driver registers no console yet) |
+| Linux apple_wdt; fbcon early console | NVMe rootfs (needs pmgr → dart → ans2) |
+| Kernel build env (podman, arm64-native) with patch pipeline | USB gadget console (parked: EP0 dies post-enumeration) |
+| SMP/cpufreq/MCC/PCIe m1n1 groundwork (Stage B) | cpufreq throttles, PCIe link-up test, USB3/TB PHY tunables |
 
-Boot-log gap #2 (`MCC: Unsupported version:mcc,t6041`) — CLOSED (Phase 1,
-2026-07-10): `mcc_init_t6041()` added; MCC initializes ADT-only at boot. Remaining
-MCC work (plane count, SLC cache-enable) is Phase 2 / Stage C, in
-`2026-07-10-t6040-mcc-plan.md`.
-
-**Upstreaming pending** (drafts ready, awaiting review/post): SMP/broken_wfi/MPIDR
-findings + confirmed constants; cpufreq patch + throttle-offset question.
+**Upstreaming pending**: SMP/broken_wfi/MPIDR + cpufreq drafts (in `done/`);
+dockchannel-uart dead-IRQ finding + poll-mode patch to the dockchannel-branch
+authors; curated code-only branch `t6040-bringup` tracks main's src/.
 
 One structural constraint colors everything below: **M4 = raw boot only** (SPTM
 owns the mach-o path). Apple-private sysregs are locked. Linux itself doesn't
@@ -153,21 +141,17 @@ early console. (Testable incrementally against Stage C.)
 
 *Target: linux-asahi boots to a shell on this machine. Weeks, parallel with B.*
 
-- **Device trees:** **DRAFT CREATED + dtc-valid 2026-07-10.** `t6040.dtsi` +
-  `t6040-j614s.dts` + generated `t6040-pmgr.dtsi` written in `~/code/linux`
-  (templated from t8132 (M4) IP + t6050 (Pro/Max) shape, not t6031 — yuka's minimal
-  M4/M5 DTs are the better base). All reg/irq values ADT-verified (14 cpus 4E+5P+5P,
-  AIC 0x5_02400000, UART irq 1559, WDT irq 827, pmgr×4, mem 0x100_00000000). Builds
-  to a 46 KB DTB. **Boot-tested 2026-07-10** (kernel built in a podman container —
-  native mac build impossible, case-insensitive FS): boots via m1n1 through the
-  whole `kboot_prepare_dt` + most of `kboot_boot`. Fixed a CPU-map gap bug (slot-9
-  placeholder). **Blocked** on an async L2C access-fault SError in the final kboot
-  steps (before the kernel jump) — Linux not started yet; carveout/SLC interaction
-  is the top suspect. Full analysis: `2026-07-10-t6040-stagec-boot-session.md`;
-  build env: memory `t6040-kernel-build-env`.
-- **AIC3:** boot log says AIC3 (vs AIC2 on M1/M2). Check the Asahi tree's M3-era
-  `apple-aic` state; if AIC3 isn't there yet this is a real driver task, and it
-  blocks *everything* (no interrupts, no boot).
+- **Device trees:** **MINIMAL DT BOOTS TO USERSPACE (2026-07-11).** `t6040.dtsi`
+  + `t6040-j614s*.dts` + generated `t6040-pmgr.dtsi` in `~/code/linux`
+  (templated from t8132/t6050, ADT-verified). The 2026-07-10 async-L2C-SError
+  handoff blocker was the m1n1 dapf init (all t6040 dapf entries trap; gated in
+  `src/dapf.c`). Board variants: `-kbd` (keyboard, known-good) and `-dcuart`
+  (keyboard + DockChannel shell, preserved at `.plans/dts/`). **Remaining:
+  full-pmgr DT hangs pre-console** — the Stage C critical path; see
+  NEXT_STEPS #2 and DEVLOG's PMGR section.
+- **AIC3:** **works** — yuka's branch has `apple,t8122-aic3` support; boots and
+  delivers interrupts (keyboard mailbox IRQs verified live). Two locked-sysreg
+  writes in `aic_init_cpu` must be skipped on M4 raw-boot (flokli patch).
 - **Core platform drivers** (mostly compat-string + minor deltas on existing
   Asahi drivers): UART, watchdog, PMGR power domains, pinctrl/GPIO, I2C/SPI,
   mailbox/RTKit (new firmware version strings for 26.x!), DART t8110, cpufreq
@@ -178,6 +162,9 @@ early console. (Testable incrementally against Stage C.)
 
 **Exit:** linux-asahi + our DT boots to initramfs shell over USB gadget/serial,
 all 14 cores online, cpufreq working.
+**Status 2026-07-12:** initramfs shell reached (maxcpus=1) with a real serial
+console over DebugUSB/dockchannel; remaining for exit: full pmgr, then
+maxcpus>1 + cpufreq DT wiring.
 
 ## Stage D — storage, USB, HID, display console (usable machine)
 
@@ -187,9 +174,9 @@ all 14 cores online, cpufreq working.
   a rootfs on disk.
 - **USB** (dwc3 + ATC PHY): external keyboard/disk/ethernet from day one; also
   the USB-gadget console m1n1 already proves works.
-- **Internal keyboard + trackpad:** M2+ MacBook Pros use **dockchannel-HID**
-  (`apple,dockchannel-hid`); j614s almost certainly the same. Verify the ADT
-  node, add compat + HID descriptors if the MTP firmware changed.
+- **Internal keyboard + trackpad:** ✅ **keyboard DONE early (2026-07-11)** via
+  dockchannel-HID (three bugs fixed — see DEVLOG); trackpad registers as
+  input0, events not yet verified (NEXT_STEPS #1).
 - **Display:** two steps.
   1. `simpledrm` on the m1n1-provided framebuffer — works immediately, no
      driver; gives a desktop-capable (unaccelerated) console. This alone plus

@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 # T6040 kernel build harness (runs INSIDE the arm64 Linux build container).
+#
+# Invocation from the host (script + patches must be visible in /out):
+#   cp .plans/scripts/t6040-kbuild.sh .plans/patches/*.patch ~/Code/linux-build-out/
+#   podman exec -e DOCKCHANNEL=1 -e BUILD_DIR=/build/linux-keyboard kbuild \
+#       bash /out/t6040-kbuild.sh image
+# (The old /kbuild.sh bind mount predates the .plans refactor and is stale;
+# exec via /out instead.)
 # The mac host FS is case-insensitive, which corrupts kernel files (xt_CONNMARK.h
 # vs xt_mark.h etc.), so we clone locally onto the container's case-sensitive FS
 # (git objects are fine; only the mac working-tree checkout is corrupt), then copy
@@ -69,97 +76,6 @@ else
     echo "aic_init_cpu locked-sysreg writes disabled OK"
 fi
 
-if [ "${PMGR_DEBUG:-0}" = "1" ]; then
-    echo "== apply T6040 PMGR visibility patch (late init + operation logging) =="
-    if grep -q 'late_initcall(apple_pmgr_ps_driver_init)' \
-        drivers/pmdomain/apple/pmgr-pwrstate.c; then
-        echo "t6040-pmgr-debug.patch already applied"
-    elif git apply --check /out/t6040-pmgr-debug.patch 2>/dev/null; then
-        git apply /out/t6040-pmgr-debug.patch
-        echo "t6040-pmgr-debug.patch applied OK"
-    else
-        echo "ERROR: t6040-pmgr-debug.patch does not apply cleanly:"
-        git apply --check /out/t6040-pmgr-debug.patch || true
-        exit 1
-    fi
-    grep -q 'late_initcall(apple_pmgr_ps_driver_init)' \
-        drivers/pmdomain/apple/pmgr-pwrstate.c \
-        && echo "PMGR late init verified OK"
-
-    echo "== apply T6040 PMGR transition trace patch =="
-    if grep -q 'set state read begin' drivers/pmdomain/apple/pmgr-pwrstate.c; then
-        echo "t6040-pmgr-trace2.patch already applied"
-    elif git apply --check /out/t6040-pmgr-trace2.patch 2>/dev/null; then
-        git apply /out/t6040-pmgr-trace2.patch
-        echo "t6040-pmgr-trace2.patch applied OK"
-    else
-        echo "ERROR: t6040-pmgr-trace2.patch does not apply cleanly:"
-        git apply --check /out/t6040-pmgr-trace2.patch || true
-        exit 1
-    fi
-
-    echo "== apply T6040 PMGR DT-controlled auto-enable exception =="
-    if grep -q 'apple,skip-auto-enable' drivers/pmdomain/apple/pmgr-pwrstate.c; then
-        echo "t6040-pmgr-skip-auto.patch already applied"
-    elif git apply --check /out/t6040-pmgr-skip-auto.patch 2>/dev/null; then
-        git apply /out/t6040-pmgr-skip-auto.patch
-        echo "t6040-pmgr-skip-auto.patch applied OK"
-    else
-        echo "ERROR: t6040-pmgr-skip-auto.patch does not apply cleanly:"
-        git apply --check /out/t6040-pmgr-skip-auto.patch || true
-        exit 1
-    fi
-
-    echo "== apply T6040 PMGR same-offset write serialization/readback =="
-    if grep -q 'auto-enable readback begin' drivers/pmdomain/apple/pmgr-pwrstate.c; then
-        echo "t6040-pmgr-readback.patch already applied"
-    elif git apply --check /out/t6040-pmgr-readback.patch 2>/dev/null; then
-        git apply /out/t6040-pmgr-readback.patch
-        echo "t6040-pmgr-readback.patch applied OK"
-    else
-        echo "ERROR: t6040-pmgr-readback.patch does not apply cleanly:"
-        git apply --check /out/t6040-pmgr-readback.patch || true
-        exit 1
-    fi
-
-    echo "== apply T6040 PMGR set() auto-enable serialization/readback =="
-    if grep -q 'set auto-enable readback begin' drivers/pmdomain/apple/pmgr-pwrstate.c; then
-        echo "t6040-pmgr-set-readback.patch already applied"
-    elif git apply --check /out/t6040-pmgr-set-readback.patch 2>/dev/null; then
-        git apply /out/t6040-pmgr-set-readback.patch
-        echo "t6040-pmgr-set-readback.patch applied OK"
-    else
-        echo "ERROR: t6040-pmgr-set-readback.patch does not apply cleanly:"
-        git apply --check /out/t6040-pmgr-set-readback.patch || true
-        exit 1
-    fi
-
-    echo "== apply T6040 PMGR set() DT-controlled auto-enable exception =="
-    if grep -q 'set auto-enable write skipped by DT' drivers/pmdomain/apple/pmgr-pwrstate.c; then
-        echo "t6040-pmgr-skip-set-auto.patch already applied"
-    elif git apply --check /out/t6040-pmgr-skip-set-auto.patch 2>/dev/null; then
-        git apply /out/t6040-pmgr-skip-set-auto.patch
-        echo "t6040-pmgr-skip-set-auto.patch applied OK"
-    else
-        echo "ERROR: t6040-pmgr-skip-set-auto.patch does not apply cleanly:"
-        git apply --check /out/t6040-pmgr-skip-set-auto.patch || true
-        exit 1
-    fi
-
-    echo "== apply T6040 PMGR preserve-boot-active policy =="
-    if grep -q 'preserving boot-active domain' drivers/pmdomain/apple/pmgr-pwrstate.c; then
-        echo "t6040-pmgr-preserve-active.patch already applied"
-    elif git apply --check /out/t6040-pmgr-preserve-active.patch 2>/dev/null; then
-        git apply /out/t6040-pmgr-preserve-active.patch
-        echo "t6040-pmgr-preserve-active.patch applied OK"
-    else
-        echo "ERROR: t6040-pmgr-preserve-active.patch does not apply cleanly:"
-        git apply --check /out/t6040-pmgr-preserve-active.patch || true
-        exit 1
-    fi
-
-fi
-
 if [ "${PMGR_FUNCTIONAL:-0}" = "1" ]; then
     echo "== apply minimal T6040 PMGR functional policy =="
     if grep -q 'skipping unsupported auto-enable' drivers/pmdomain/apple/pmgr-pwrstate.c; then
@@ -226,21 +142,6 @@ if [ "${DOCKCHANNEL:-0}" = "1" ]; then
     else
         echo "ERROR: t6040-dockchannel-fixes.patch does not apply cleanly:"
         git apply --check /out/t6040-dockchannel-fixes.patch || true
-        exit 1
-    fi
-fi
-
-if [ "${DOCKCHANNEL_DEBUG:-0}" = "1" ]; then
-    echo "== apply T6040 MTP wake diagnostic patch =="
-    if grep -q 'MTPDBG before RUN' \
-        drivers/hid/apple-dockchannel-hid/apple_dockchannel_hid.c; then
-        echo "t6040-dockchannel-debug.patch already applied"
-    elif git apply --check /out/t6040-dockchannel-debug.patch 2>/dev/null; then
-        git apply /out/t6040-dockchannel-debug.patch
-        echo "t6040-dockchannel-debug.patch applied OK"
-    else
-        echo "ERROR: t6040-dockchannel-debug.patch does not apply cleanly:"
-        git apply --check /out/t6040-dockchannel-debug.patch || true
         exit 1
     fi
 fi

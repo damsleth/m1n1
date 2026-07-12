@@ -1,7 +1,7 @@
 #!/bin/bash
 # Establish the DebugUSB (KIS) two-way console/proxy link to the t6040 target.
 #
-# Usage: bash .plans/t6040-debugusb-console.sh [reboot]
+# Usage: bash .plans/scripts/t6040-debugusb-console.sh [reboot]
 #   (no arg)  target already running -> just enter debugusb + attach kisd
 #   reboot    reboot the target and re-enter debugusb during boot
 #             (captures the full boot log including iBoot markers)

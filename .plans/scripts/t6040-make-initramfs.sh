@@ -2,11 +2,11 @@
 # Replace /init in the known-good proof initramfs with the persistent-shell init.
 set -euo pipefail
 
-ROOT=$(cd "$(dirname "$0")/.." && pwd)
+ROOT=$(cd "$(dirname "$0")/../.." && pwd)
 OUT=${OUT:-/Users/damsleth/Code/linux-build-out}
 BASE=${BASE:-$OUT/initramfs.cpio.gz}
-DEST=${DEST:-$OUT/initramfs-watchdog.cpio.gz}
-INIT_SOURCE=${INIT_SOURCE:-$ROOT/.plans/t6040-init}
+DEST=${DEST:-$OUT/initramfs-dcuart.cpio.gz}
+INIT_SOURCE=${INIT_SOURCE:-$ROOT/.plans/scripts/t6040-init-dcuart}
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 

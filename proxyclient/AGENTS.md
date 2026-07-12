@@ -5,10 +5,19 @@ Python client that talks to m1n1's proxy over USB serial. **First read the root
 
 ## Connect
 
+Two transports; DebugUSB is the default since 2026-07-12.
+
+- **DebugUSB (kisd pty):** `bash .plans/scripts/t6040-debugusb-console.sh
+  [reboot]` → `export M1N1DEVICE=/tmp/m1n1`. Discipline (full rules in
+  `.plans/DEVLOG.md`): keep a `cat` reader on the pty whenever no tool is using
+  it (an unread pty wedges the KIS stream into a fake one-way link), never leave
+  that reader attached while a proxyclient tool runs (it steals reply bytes),
+  and retry once on a post-boot `UartCMDError` (console-byte desync).
+  DebugUSB replaces the gadget on the DFU port — no `/dev/cu.usbmodem*` then.
+- **Plain cable:** `export M1N1DEVICE=/dev/cu.usbmodemJ22GYCN4YG1` — the
+  **lower**-numbered node is the proxy; the `…YG3` node is the secondary UART.
 - Python **must be pyenv 3.10.7** (has `pyserial`+`construct`; the 3.9 default
   lacks them). `pyenv local 3.10.7` is set in the repo, or use the full path.
-- `export M1N1DEVICE=/dev/cu.usbmodemJ22GYCN4YG1` — the **lower**-numbered node is
-  the proxy; the `…YG3` node is the secondary UART.
 - Interactive: `M1N1DEVICE=… python3 proxyclient/tools/shell.py`.
 - Scripted: `sys.path.append("proxyclient")`, `from m1n1.setup import *` gives
   `p` (proxy), `iface`, `u` (utils), `u.adt`, `u.base` (runtime load base).
@@ -34,8 +43,11 @@ def gread64(addr):                     # guarded read: (value, faulted)
 ```
 This catches **synchronous** aborts only. Wrong-offset MMIO on M4 can raise an
 **async SError** that sails past the guard, prints `TTY> Exception: SError`, and
-drops the USB link → power-cycle. So: prefer reading the **ADT** (`u.adt[...]`,
-`node.getprop(...)`, `node.reg`) to derive addresses; never sweep unknown offsets.
+kills m1n1 (recover with `t6040-debugusb-console.sh reboot`). So: prefer reading
+the **ADT** (`u.adt[...]`, `node.getprop(...)`, `node.reg`) to derive addresses;
+never sweep unknown offsets. Example of how narrow the traps are: the
+dockchannel-uart block maps only +0xc000 and +0x28000..+0x38004 — reading
++0x20000 SError'd m1n1 even though the sibling mtp block maps that offset.
 
 ## Run code on a specific core
 
@@ -53,10 +65,13 @@ Gotchas: `u.mrs("mpidr_el1")` fails (name not in the sysreg table) but `mrs x0,
 mpidr_el1` assembles fine in a leaf. ARMAsm needs the LLVM toolchain (auto-resolved
 via `brew --prefix llvm` / `lld`).
 
-## Local edit
+## Local edits (fork deltas vs upstream)
 
-`proxyclient/m1n1/proxy.py` has a local delta: `CPUFeatures` parses `broken_wfi`
-(replaced a padding byte) — must stay in lockstep with the m1n1 binary's struct.
+- `proxyclient/m1n1/proxy.py`: `CPUFeatures` parses `broken_wfi` (replaced a
+  padding byte) — must stay in lockstep with the m1n1 binary's struct.
+- `proxyclient/m1n1/proxy.py`: pty support in `Serial` (raw termios, tolerant
+  baud ioctl) — required for the kisd DebugUSB bridge; without it replies get
+  termios-mangled (symptom: reply cmd `0x5eaa55ff`).
 
 Deeper: SMP topology, per-core MPIDR, and the run-code recipe are in the host-local
 memory dir referenced by the root `AGENTS.md`.
