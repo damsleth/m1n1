@@ -1,0 +1,139 @@
+#!/bin/busybox sh
+/bin/busybox mount -t proc none /proc
+/bin/busybox mount -t sysfs none /sys
+/bin/busybox mount -t devtmpfs none /dev 2>/dev/null
+
+echo ""
+echo "==================================================="
+echo "  USERSPACE + HID + USB GADGET BRING-UP (t6040)"
+echo "==================================================="
+/bin/busybox uname -a
+
+if [ -f /etc/no-latin1.bkeymap ]; then
+    /bin/busybox loadkmap < /etc/no-latin1.bkeymap && \
+        echo "--- Norwegian console keymap loaded ---"
+fi
+
+if [ -c /dev/watchdog0 ]; then
+    /bin/busybox watchdog -T 30 -t 10 /dev/watchdog0 &
+    echo "--- watchdog0 active (30s timeout, ping every 10s) ---"
+else
+    echo "--- WARNING: /dev/watchdog0 missing ---"
+fi
+
+# Let asynchronous platform probes settle (MTP + dwc3).
+/bin/busybox sleep 5
+
+echo "--- dwc3 / gadget / DART dmesg ---"
+/bin/busybox dmesg | /bin/busybox grep -Ei \
+    'dwc3|gadget|udc|38228|8a280|92280|dart|input|keyboard' | /bin/busybox tail -60
+
+echo "--- UDCs ---"
+/bin/busybox ls /sys/class/udc/ 2>/dev/null
+
+# EP0 tracing (needs the ftrace-enabled kernel): capture every dwc3 event
+# and dwc3 hard-irq so we can see whether host control transfers reach the
+# controller after enumeration. Dump with: tail -50 /sys/kernel/tracing/trace
+/bin/busybox mount -t tracefs none /sys/kernel/tracing 2>/dev/null
+if [ -d /sys/kernel/tracing/events/dwc3 ]; then
+    echo 8192 > /sys/kernel/tracing/buffer_size_kb 2>/dev/null
+    echo 1 > /sys/kernel/tracing/events/dwc3/enable 2>/dev/null
+    echo 'name == "dwc3"' > /sys/kernel/tracing/events/irq/irq_handler_entry/filter 2>/dev/null
+    echo 1 > /sys/kernel/tracing/events/irq/irq_handler_entry/enable 2>/dev/null
+    echo "--- dwc3 tracing ENABLED (tail -50 /sys/kernel/tracing/trace) ---"
+else
+    echo "--- no dwc3 trace events in this kernel ---"
+fi
+
+# Configfs gadget on EVERY UDC: whichever port has the tether enumerates.
+/bin/busybox mount -t configfs none /sys/kernel/config 2>/dev/null
+G=/sys/kernel/config/usb_gadget
+i=0
+for udc in /sys/class/udc/*; do
+    [ -e "$udc" ] || continue
+    u=$(/bin/busybox basename "$udc")
+    d=$G/g$i
+    /bin/busybox mkdir -p "$d"
+    # Clone m1n1's proven-on-this-host CDC identity (src/usb_dwc3.c):
+    # vid 0x1209 pid 0x316d, bcdUSB 2.00, class 02/00/00, self-powered,
+    # bMaxPower 250 (=500mA), no iConfiguration string.
+    echo 0x1209 > "$d/idVendor"
+    echo 0x316d > "$d/idProduct"
+    echo 0x0200 > "$d/bcdUSB"
+    echo 0x02 > "$d/bDeviceClass"
+    echo 0x00 > "$d/bDeviceSubClass"
+    echo 0x00 > "$d/bDeviceProtocol"
+    /bin/busybox mkdir -p "$d/strings/0x409"
+    echo "t6040-$u" > "$d/strings/0x409/serialnumber"
+    echo "Asahi bring-up" > "$d/strings/0x409/manufacturer"
+    echo "M4 Pro gadget console ($u)" > "$d/strings/0x409/product"
+    /bin/busybox mkdir -p "$d/functions/acm.GS$i"
+    /bin/busybox mkdir -p "$d/configs/c.1"
+    echo 0xc0 > "$d/configs/c.1/bmAttributes"
+    echo 500 > "$d/configs/c.1/MaxPower"
+    /bin/busybox ln -s "$d/functions/acm.GS$i" "$d/configs/c.1/"
+    if echo "$u" > "$d/UDC" 2>/dev/null; then
+        echo "gadget g$i (NCM) bound to $u"
+    else
+        echo "gadget g$i FAILED to bind $u"
+    fi
+    i=$((i+1))
+done
+[ "$i" = 0 ] && echo "--- NO UDCs FOUND (dwc3 did not probe) ---"
+
+/bin/busybox sleep 2
+
+# Respawning root shell on every gadget serial port (ACM).
+for t in /dev/ttyGS0 /dev/ttyGS1 /dev/ttyGS2; do
+    [ -c "$t" ] || continue
+    (
+        while :; do
+            /bin/busybox setsid /bin/busybox sh -c \
+                "exec /bin/busybox sh <$t >$t 2>&1"
+            /bin/busybox sleep 1
+        done
+    ) &
+    echo "shell respawn loop on $t"
+done
+
+# Static IP + DHCP server per gadget interface; the host Mac auto-DHCPs.
+n=0
+for ifc in usb0 usb1 usb2; do
+    /bin/busybox ip link show "$ifc" >/dev/null 2>&1 || continue
+    /bin/busybox ifconfig "$ifc" 10.55.$n.1 netmask 255.255.255.0 up
+    cf=/tmp/udhcpd-$ifc.conf
+    lf=/tmp/udhcpd-$ifc.leases
+    /bin/busybox touch "$lf"
+    {
+        echo "interface $ifc"
+        echo "start 10.55.$n.50"
+        echo "end 10.55.$n.99"
+        echo "option subnet 255.255.255.0"
+        echo "lease_file $lf"
+        echo "max_leases 8"
+    } > "$cf"
+    /bin/busybox udhcpd -f "$cf" &
+    echo "net: $ifc = 10.55.$n.1/24, dhcp 10.55.$n.50-99"
+    n=$((n+1))
+done
+
+# Remote shells: telnetd (human use) + raw nc shell on :2323 (automation).
+/bin/busybox mkdir -p /dev/pts
+/bin/busybox mount -t devpts devpts /dev/pts 2>/dev/null
+/bin/busybox telnetd -l /bin/sh 2>/dev/null && echo "telnetd on :23"
+(
+    while :; do
+        /bin/busybox nc -ll -p 2323 -e /bin/busybox sh 2>/dev/null || \
+            /bin/busybox nc -l -p 2323 -e /bin/busybox sh
+        /bin/busybox sleep 1
+    done
+) &
+echo "raw shell on :2323"
+
+echo "--- /proc/bus/input/devices (keyboard check) ---"
+/bin/busybox grep -E 'Name|Handlers' /proc/bus/input/devices 2>/dev/null
+echo "==================================================="
+echo "  Local shell below; gadget shells on ttyGS*."
+echo "  On the host: screen /dev/cu.usbmodem<new> 115200"
+echo "==================================================="
+exec /bin/busybox sh
