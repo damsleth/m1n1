@@ -20,7 +20,7 @@ the linked docs for depth (progressive disclosure).**
    time, ready to power-cycle. (Learned the hard way — see `src/AGENTS.md`.)
 4. **USB gadget is not hot-plug safe** — never suggest unplugging. Recovery no
    longer needs a hand on the button: `bash
-   .plans/scripts/t6040-debugusb-console.sh reboot` warm-reboots the M4 over the
+   ~/Code/wallace/scripts/t6040-debugusb-console.sh reboot` warm-reboots the M4 over the
    DebugUSB cable and re-attaches (→ "Running proxy…" in <20 s). Reboots for the
    bring-up loop are fine; still coordinate if the machine might be in use.
 5. **Don't post anything externally** (GitHub, IRC/#asahi-dev). Draft only; the
@@ -42,28 +42,28 @@ fresh build makes `build/m1n1.elf` symbols valid against the live image
 (`runtime = u.base + elf_vaddr`).
 
 **DebugUSB transport (the default since 2026-07-12):** with a DP/TB cable in the
-DFU port, `bash .plans/scripts/t6040-debugusb-console.sh [reboot]` gives the same
+DFU port, `bash ~/Code/wallace/scripts/t6040-debugusb-console.sh [reboot]` gives the same
 proxy on a kisd pty — `M1N1DEVICE=/tmp/m1n1` — plus remote reboot, with no plain
 tether needed. It replaces m1n1's USB gadget on that port (no `/dev/cu.usbmodem*`
-while active). **Read the pty-discipline rules in `.plans/DEVLOG.md` first** —
+while active). **Read the pty-discipline rules in `~/Code/wallace/DEVLOG.md` first** —
 mis-handling the pty makes the link look dead.
 
-**Linux boot loop:** `bash .plans/scripts/t6040-boot-dcuart.sh` chainloads m1n1
+**Linux boot loop:** `bash ~/Code/wallace/scripts/t6040-boot-dcuart.sh` chainloads m1n1
 and boots the kernel to a two-way BusyBox shell on `/dev/ttydc0` over the same
 cable (console log + `printf 'cmd\n' > /tmp/m1n1`). Kernel builds run in the
-`kbuild` podman container via `.plans/scripts/t6040-kbuild.sh` — recipes in
-`.plans/DEVLOG.md`.
+`kbuild` podman container via `~/Code/wallace/scripts/t6040-kbuild.sh` — recipes in
+`~/Code/wallace/DEVLOG.md`.
 
 ## Where the knowledge lives (don't re-derive it)
 
-- `.plans/NEXT_STEPS.md` — **the handoff doc**: what to do next, nothing else.
-- `.plans/DEVLOG.md` — operational reference: boot/build recipes, DebugUSB link
+- `~/Code/wallace/NEXT_STEPS.md` — **the handoff doc**: what to do next, nothing else.
+- `~/Code/wallace/DEVLOG.md` — operational reference: boot/build recipes, DebugUSB link
   rules, solved blockers, investigation history, dead ends.
-- `.plans/roadmap.md` — the long game (stages A–H), current snapshot.
-- `.plans/done/` — finished per-topic plans, session write-ups, drafts.
-- `.plans/scripts/` — the live harnesses (debugusb-console, boot-dcuart,
+- `~/Code/wallace/roadmap.md` — the long game (stages A–H), current snapshot.
+- `~/Code/wallace/done/` — finished per-topic plans, session write-ups, drafts.
+- `~/Code/wallace/scripts/` — the live harnesses (debugusb-console, boot-dcuart,
   bootcap-fb, kbuild, make-initramfs, init-dcuart).
-- `.plans/patches/` + `.plans/dts/` — kernel patches and the dcuart board DT the
+- `~/Code/wallace/patches/` + `~/Code/wallace/dts/` — kernel patches and the dcuart board DT the
   kbuild container applies (copy to `~/Code/linux-build-out/` before building).
 - `proxyclient/AGENTS.md` — how to talk to the M4 (connect, run code, safe probing).
 - `src/AGENTS.md` — m1n1 firmware C: T6040 chip constants, per-driver status & gotchas.
