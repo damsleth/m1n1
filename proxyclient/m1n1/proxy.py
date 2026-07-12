@@ -18,6 +18,22 @@ class Serial(serial.Serial):
     def reset_input_buffer(self):
         return
 
+    def _set_special_baudrate(self, baudrate):
+        try:
+            super()._set_special_baudrate(baudrate)
+        except OSError:
+            pass  # ptys (e.g. kisd's) don't support baud rate ioctls
+
+    def open(self):
+        super().open()
+        # ptys (e.g. kisd's) come up with echo/CR-LF translation that
+        # corrupts the binary proxy protocol; force fully raw termios
+        try:
+            import tty
+            tty.setraw(self.fd)
+        except Exception:
+            pass
+
 class UartError(RuntimeError):
     pass
 
