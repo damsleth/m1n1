@@ -16,6 +16,8 @@ parser.add_argument('-t', '--tty', type=str)
 parser.add_argument('-u', '--u-boot', type=pathlib.Path, help="load u-boot before linux")
 parser.add_argument('-E', '--efi', action="store_true", help="payload is EFI stub (requires u-boot)")
 parser.add_argument('-T', '--tso', action="store_true", help="enable TSO")
+parser.add_argument('--no-tty', action="store_true",
+                    help="exit after handoff instead of starting miniterm")
 args = parser.parse_args()
 
 from m1n1.setup import *
@@ -162,4 +164,5 @@ print("DAIF: %x" % daif)
 
 p.kboot_boot(boot_addr)
 
-iface.ttymode(tty_dev)
+if not args.no_tty:
+    iface.ttymode(tty_dev)
