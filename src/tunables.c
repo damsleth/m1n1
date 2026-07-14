@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MIT */
 
 #include "adt.h"
+#include "cpu_regs.h"
 #include "tunables.h"
 #include "types.h"
 #include "utils.h"
@@ -83,6 +84,22 @@ static int tunables_apply_local_addr_internal(const char *path, const char *prop
     if (tunables_adt_find(path, prop, &info, sizeof(struct tunable_local)) < 0)
         return -1;
 
+    if (trace) {
+        /*
+         * T6040 can report bad fabric accesses as an imprecise asynchronous
+         * L2C SError. Fence the preceding PMGR work and check for an already
+         * pending error before attributing one to the first tunable below.
+         * Do not clear the status: preserve it for the exception report.
+         */
+        sysop("dsb sy");
+        u64 l2c_err_sts = mrs(SYS_IMP_APL_L2C_ERR_STS);
+        if (l2c_err_sts) {
+            printf("tunable: %s pending L2C_ERR_STS=0x%lx before first RMW\n", prop,
+                   l2c_err_sts);
+            return -1;
+        }
+    }
+
     const struct tunable_local *tunables = (const struct tunable_local *)info.tunable_raw;
     for (u32 i = 0; i < info.tunable_len; ++i) {
         const struct tunable_local *tunable = &tunables[i];
@@ -110,8 +127,17 @@ static int tunables_apply_local_addr_internal(const char *path, const char *prop
                 return -1;
         }
 
-        if (trace)
+        if (trace) {
+            /* Force this RMW to complete before sampling the async status. */
+            sysop("dsb sy");
+            u64 l2c_err_sts = mrs(SYS_IMP_APL_L2C_ERR_STS);
+            if (l2c_err_sts) {
+                printf("tunable: %s[%d] pending L2C_ERR_STS=0x%lx\n", prop, i,
+                       l2c_err_sts);
+                return -1;
+            }
             printf("tunable: %s[%d] done\n", prop, i);
+        }
     }
     return 0;
 }
