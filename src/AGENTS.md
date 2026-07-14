@@ -62,10 +62,13 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   before the first and after each traced RMW, samples but never clears status,
   and would abort on a nonzero sample. `[70] done` proved its immediate sample
   was zero before the same delayed SError. All three traced logs stop at the
-  identical line and byte count. Main `3e772779` prepares a zero-PCIe-write
+  identical trace boundary. Main `3e772779` ran a zero-PCIe-write
   trace-volume control: it reads the AXI property from the ADT, prints identical
-  trace pairs, and returns before PCIe PMGR or controller MMIO. It is the next
-  separately gated step.
+  trace pairs, and returns before PCIe PMGR or controller MMIO. It still faulted
+  after `[70] done`, proving a logging artifact. The 16 KiB log ring occupies
+  `0x105ce7a4000..0x105ce7a8000`, exactly to top-of-RAM; its initial 8 KiB
+  console backlog makes it wrap during `[61] done`, with the SError delivered
+  1,082 bytes later. An upper-guard zero-write control is next and gated.
   **`pcie_init` is kboot-only +
   invasive: do not run it from the proxy, and do not boot this path without
   approval for that exact build.** See
