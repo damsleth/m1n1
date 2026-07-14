@@ -450,7 +450,6 @@ static int pcie_init_controller(int controller, const char *path)
          * write-bearing traces failed after the same output line and byte
          * count; distinguish a trace/log artifact before another MMIO test.
          */
-        printf("pcie: T6040 AXI trace dry run; no PCIe MMIO\n");
         if (tunables_trace_local_dry_run(path, "apcie-axi2af-tunables",
                                          state->pcie_regs->axi_idx)) {
             printf("pcie: Error tracing %s for %s\n", "apcie-axi2af-tunables", path);
