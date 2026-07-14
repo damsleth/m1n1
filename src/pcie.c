@@ -217,11 +217,14 @@ static const struct reg_info regs_t6031 = {
  * fires identically to that validated template. NOT tested at boot — pcie_init is
  * kboot-only; correctness here is ADT-derived + faithful t6031 reuse.
  *
- * Open RE (deferred to Stage C, see plan): t6040 also has two tunables no current
- * code applies — apcie-cio3pllcore-tunables and apcie-pcieclkgen-tunables (likely
- * targeting reg[5]/reg[6]). Left unapplied on purpose: skipping is safe, guessing
- * a target window would async-SError at bring-up.
+ * The two extra shared windows are now statically resolved from the paired macOS
+ * AppleT6040PCIe driver. AppleT6040PCIe::start() assigns the CIO3 PLL accessor to
+ * DT reg[5] and the PCIe clock-generator accessor to DT reg[6]. Keep these indices
+ * explicit: swapping them would direct the tunable writes at the wrong block.
  */
+#define APCIE_T6040_CIO3PLLCORE_IDX 5
+#define APCIE_T6040_PCIECLKGEN_IDX  6
+
 static const struct reg_info regs_t6040 = {
     .type = APCIE_T6031,
     .compat = APCIE_T8122,
@@ -446,20 +449,17 @@ static int pcie_init_controller(int controller, const char *path)
         return -1;
     }
 
-    /*
-     * t6040 PHY bring-up is not yet implemented and HANGS the machine here
-     * (verified at Stage C boot 2026-07-10): the t6040 ATC/PCIe PHY needs the
-     * apcie-cio3pllcore-tunables / apcie-pcieclkgen-tunables (new on t6040, target
-     * reg window not yet RE'd) applied before the PHY reference-clock/CLK req-ack
-     * polls below will complete. Until that's RE'd, bail cleanly after the safe
-     * ADT/AXI2AF-tunable phase so kboot can proceed to the kernel. PCIe is not
-     * required for console boot (no pcie node in the minimal t6040 DT). See
-     * .plans/2026-07-10-t6040-pcie-plan.md.
-     */
     if (state->pcie_regs == &regs_t6040) {
-        printf("pcie: t6040 PHY bring-up deferred (needs cio3pllcore/pcieclkgen "
-               "tunable RE); skipping\n");
-        return 0;
+        if (tunables_apply_local(path, "apcie-cio3pllcore-tunables",
+                                 APCIE_T6040_CIO3PLLCORE_IDX)) {
+            printf("pcie: Error applying %s for %s\n", "apcie-cio3pllcore-tunables", path);
+            return -1;
+        }
+        if (tunables_apply_local(path, "apcie-pcieclkgen-tunables",
+                                 APCIE_T6040_PCIECLKGEN_IDX)) {
+            printf("pcie: Error applying %s for %s\n", "apcie-pcieclkgen-tunables", path);
+            return -1;
+        }
     }
 
     /*

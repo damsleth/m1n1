@@ -43,14 +43,16 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   carveouts) — Stage-C-only, resolve via bounded value-search or macOS dump. Do NOT
   blind-sweep MCC offsets (async SError → power-cycle). See
   `~/Code/wallace/done/2026-07-10-t6040-mcc-plan.md`.
-- **pcie.c — Phase 1 DONE (2026-07-10).** Added `regs_t6040` + `apcie,t6040`
-  branch. ADT-verified (`/arm-io/apcie0`): 35 regs, #ports=4, shared=reg[0..6] then
-  4×7 port regs ⇒ `shared_reg_count=7` (only delta vs t6031; 8 fails the
-  even-divide check). Reuses t6031/T8122 path, num_phys=1. **`pcie_init` is
-  kboot-only + invasive — NEVER run it live on the M4; validate at Stage C, gated.**
-  Two new tunables (`apcie-cio3pllcore`, `apcie-pcieclkgen`, likely reg[5]/reg[6])
-  left unapplied on purpose (skipping is safe; guessing a target window = async
-  SError). See `~/Code/wallace/done/2026-07-10-t6040-pcie-plan.md`.
+- **pcie.c — T6040 register map DONE; live validation GATED (2026-07-14).** Added
+  `regs_t6040` + `apcie,t6040`; ADT verifies 35 regs, #ports=4, shared=reg[0..6]
+  then 4×7 port regs, so `shared_reg_count=7`. Static analysis of the paired
+  macOS `AppleT6040PCIe::start()` now proves `apcie-cio3pllcore-tunables` targets
+  reg[5] (`0x415046200`) and `apcie-pcieclkgen-tunables` targets reg[6]
+  (`0x415044000`); the T6040-only path applies both and continues through the
+  reused t6031/T8122 PHY sequence. **`pcie_init` is kboot-only + invasive: do not
+  run it from the proxy, and do not boot this path until the exact ADT-derived
+  writes have maintainer approval.** See
+  `~/Code/wallace/done/2026-07-14-t6040-wireless-pcie-map.md`.
 - **kboot_atc.c / ATC-USB-DART — AUDITED 2026-07-10 (item 4).** All kboot-only +
   FDT-only (no MMIO). DART done (t6040 = `dart,t8110`, supported). ACIO USB4
   rc/pcie_adapter tunable names present on `acio0` → work as-is. **ATC PHY tunables
