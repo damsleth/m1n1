@@ -50,11 +50,13 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   reg[5] (`0x415046200`) and `apcie-pcieclkgen-tunables` targets reg[6]
   (`0x415044000`); the T6040-only path applies both and continues through the
   reused t6031/T8122 PHY sequence. The first approved live attempt reached
-  `No common tunables` and then hung before the next status message; DebugUSB
-  warm-reboot recovered it. Do not repeat that opaque sequence unchanged. The
-  current diagnostic build logs every T6040 local tunable immediately before
-  and after its RMW and returns after the clock groups, before all PHY/port
-  writes. It has not been approved for a live run. **`pcie_init` is kboot-only +
+  `No common tunables`; a traced retry delivered an asynchronous SError after
+  AXI tunable `[70]` and before `[71]`. Offline disassembly proved Apple enables
+  clock gates 0–6 before AXI/CIO3/clkgen and gate 7 (`APCIE_PHY_SW`) afterward;
+  m1n1 had enabled all eight up front. Main `6efe2d45` now matches Apple's gate
+  order, logs every T6040 local tunable immediately before and after its RMW,
+  and returns after the late gate but before all PHY/port writes. The corrected
+  build has not been approved for a live run. **`pcie_init` is kboot-only +
   invasive: do not run it from the proxy, and do not boot this path without
   approval for that exact build.** See
   `~/Code/wallace/done/2026-07-14-t6040-wireless-pcie-map.md`.
