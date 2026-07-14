@@ -445,20 +445,6 @@ static int pcie_init_controller(int controller, const char *path)
 
     if (state->pcie_regs == &regs_t6040) {
         /*
-         * Bring-up control: reproduce the exact AXI trace volume without
-         * enabling a PCIe clock gate or accessing controller MMIO. Three
-         * write-bearing traces failed after the same output line and byte
-         * count; distinguish a trace/log artifact before another MMIO test.
-         */
-        if (tunables_trace_local_dry_run(path, "apcie-axi2af-tunables",
-                                         state->pcie_regs->axi_idx)) {
-            printf("pcie: Error tracing %s for %s\n", "apcie-axi2af-tunables", path);
-            return -1;
-        }
-        printf("pcie: T6040 AXI trace dry run complete; no PCIe MMIO\n");
-        return -1;
-
-        /*
          * ApplePCIEBaseT8132::_enableRootComplex() enables every clock gate
          * except the last one before applying the controller tunables. It
          * enables gate 7 (APCIE_PHY_SW on T6040) only after configuring the
