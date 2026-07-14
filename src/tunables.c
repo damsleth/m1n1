@@ -75,7 +75,8 @@ struct tunable_local {
     u64 value;
 } PACKED;
 
-int tunables_apply_local_addr(const char *path, const char *prop, uintptr_t base)
+static int tunables_apply_local_addr_internal(const char *path, const char *prop, uintptr_t base,
+                                              bool trace)
 {
     struct tunable_info info;
 
@@ -85,26 +86,44 @@ int tunables_apply_local_addr(const char *path, const char *prop, uintptr_t base
     const struct tunable_local *tunables = (const struct tunable_local *)info.tunable_raw;
     for (u32 i = 0; i < info.tunable_len; ++i) {
         const struct tunable_local *tunable = &tunables[i];
+        uintptr_t addr = base + tunable->offset;
+
+        if (trace)
+            printf("tunable: %s[%d] addr=0x%lx size=%d mask=0x%lx value=0x%lx\n", prop, i,
+                   addr, tunable->size, tunable->mask, tunable->value);
 
         switch (tunable->size) {
             case 1:
-                mask8(base + tunable->offset, tunable->mask, tunable->value);
+                mask8(addr, tunable->mask, tunable->value);
                 break;
             case 2:
-                mask16(base + tunable->offset, tunable->mask, tunable->value);
+                mask16(addr, tunable->mask, tunable->value);
                 break;
             case 4:
-                mask32(base + tunable->offset, tunable->mask, tunable->value);
+                mask32(addr, tunable->mask, tunable->value);
                 break;
             case 8:
-                mask64(base + tunable->offset, tunable->mask, tunable->value);
+                mask64(addr, tunable->mask, tunable->value);
                 break;
             default:
                 printf("tunable: unknown tunable size 0x%08x\n", tunable->size);
                 return -1;
         }
+
+        if (trace)
+            printf("tunable: %s[%d] done\n", prop, i);
     }
     return 0;
+}
+
+int tunables_apply_local_addr(const char *path, const char *prop, uintptr_t base)
+{
+    return tunables_apply_local_addr_internal(path, prop, base, false);
+}
+
+int tunables_apply_local_addr_trace(const char *path, const char *prop, uintptr_t base)
+{
+    return tunables_apply_local_addr_internal(path, prop, base, true);
 }
 
 int tunables_apply_local(const char *path, const char *prop, u32 reg_offset)
@@ -121,4 +140,20 @@ int tunables_apply_local(const char *path, const char *prop, u32 reg_offset)
     }
 
     return tunables_apply_local_addr(path, prop, base);
+}
+
+int tunables_apply_local_trace(const char *path, const char *prop, u32 reg_offset)
+{
+    struct tunable_info info;
+
+    if (tunables_adt_find(path, prop, &info, sizeof(struct tunable_local)) < 0)
+        return -1;
+
+    u64 base;
+    if (adt_get_reg(adt, info.node_path, "reg", reg_offset, &base, NULL) < 0) {
+        printf("tunable: Error getting regs\n");
+        return -1;
+    }
+
+    return tunables_apply_local_addr_trace(path, prop, base);
 }

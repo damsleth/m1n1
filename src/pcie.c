@@ -267,6 +267,22 @@ struct state {
 
 static struct state controllers[NUM_CONTROLLERS];
 
+static int pcie_apply_local(const struct state *state, const char *path, const char *prop,
+                            u32 reg_idx)
+{
+    if (state->pcie_regs == &regs_t6040)
+        return tunables_apply_local_trace(path, prop, reg_idx);
+    return tunables_apply_local(path, prop, reg_idx);
+}
+
+static int pcie_apply_local_addr(const struct state *state, const char *path, const char *prop,
+                                 uintptr_t base)
+{
+    if (state->pcie_regs == &regs_t6040)
+        return tunables_apply_local_addr_trace(path, prop, base);
+    return tunables_apply_local_addr(path, prop, base);
+}
+
 static int pcie_init_controller(int controller, const char *path)
 {
     struct state *state = &controllers[controller];
@@ -433,7 +449,8 @@ static int pcie_init_controller(int controller, const char *path)
 
     if (!adt_getprop(adt, adt_offset, "apcie-axi2af-tunables", NULL)) {
         printf("pcie: No axi2af tunables\n");
-    } else if (tunables_apply_local(path, "apcie-axi2af-tunables", state->pcie_regs->axi_idx)) {
+    } else if (pcie_apply_local(state, path, "apcie-axi2af-tunables",
+                                state->pcie_regs->axi_idx)) {
         printf("pcie: Error applying %s for %s\n", "apcie-axi2af-tunables", path);
         return -1;
     }
@@ -444,19 +461,20 @@ static int pcie_init_controller(int controller, const char *path)
 
     if (!adt_getprop(adt, adt_offset, "apcie-common-tunables", NULL)) {
         printf("pcie: No common tunables\n");
-    } else if (tunables_apply_local(path, "apcie-common-tunables", state->pcie_regs->rc_idx)) {
+    } else if (pcie_apply_local(state, path, "apcie-common-tunables",
+                                state->pcie_regs->rc_idx)) {
         printf("pcie: Error applying %s for %s\n", "apcie-common-tunables", path);
         return -1;
     }
 
     if (state->pcie_regs == &regs_t6040) {
-        if (tunables_apply_local(path, "apcie-cio3pllcore-tunables",
-                                 APCIE_T6040_CIO3PLLCORE_IDX)) {
+        if (pcie_apply_local(state, path, "apcie-cio3pllcore-tunables",
+                             APCIE_T6040_CIO3PLLCORE_IDX)) {
             printf("pcie: Error applying %s for %s\n", "apcie-cio3pllcore-tunables", path);
             return -1;
         }
-        if (tunables_apply_local(path, "apcie-pcieclkgen-tunables",
-                                 APCIE_T6040_PCIECLKGEN_IDX)) {
+        if (pcie_apply_local(state, path, "apcie-pcieclkgen-tunables",
+                             APCIE_T6040_PCIECLKGEN_IDX)) {
             printf("pcie: Error applying %s for %s\n", "apcie-pcieclkgen-tunables", path);
             return -1;
         }
@@ -468,7 +486,8 @@ static int pcie_init_controller(int controller, const char *path)
 
     if (!adt_getprop(adt, adt_offset, "apcie-phy-tunables", NULL)) {
         printf("pcie: No PHY tunables\n");
-    } else if (tunables_apply_local(path, "apcie-phy-tunables", state->pcie_regs->phy_idx)) {
+    } else if (pcie_apply_local(state, path, "apcie-phy-tunables",
+                                state->pcie_regs->phy_idx)) {
         printf("pcie: Error applying %s for %s\n", "apcie-phy-tunables", path);
         return -1;
     }
@@ -529,11 +548,11 @@ static int pcie_init_controller(int controller, const char *path)
             snprintf(auspma_prop, sizeof(auspma_prop), "apcie-phy-%d-ip-auspma-tunables", phy);
         }
 
-        if (tunables_apply_local_addr(path, pll_prop, state->phy_ip_base[phy])) {
+        if (pcie_apply_local_addr(state, path, pll_prop, state->phy_ip_base[phy])) {
             printf("pcie: Error applying %s for %s\n", pll_prop, path);
             return -1;
         }
-        if (tunables_apply_local_addr(path, auspma_prop, state->phy_ip_base[phy])) {
+        if (pcie_apply_local_addr(state, path, auspma_prop, state->phy_ip_base[phy])) {
             printf("pcie: Error applying %s for %s\n", auspma_prop, path);
             return -1;
         }
@@ -688,7 +707,8 @@ static int pcie_init_controller(int controller, const char *path)
                 write32(state->port_base[port] + 0x83c, 0x0);
         }
 
-        if (tunables_apply_local_addr(bridge, "apcie-config-tunables", state->port_base[port])) {
+        if (pcie_apply_local_addr(state, bridge, "apcie-config-tunables",
+                                  state->port_base[port])) {
             printf("pcie: Error applying %s for %s\n", "apcie-config-tunables", bridge);
             return -1;
         }
@@ -770,15 +790,15 @@ static int pcie_init_controller(int controller, const char *path)
         /* Make Designware PCIe Core registers writable. */
         set32(config_base + DWC_DBI_RO_WR, DWC_DBI_RO_WR_EN);
 
-        if (tunables_apply_local_addr(bridge, "pcie-rc-tunables", config_base)) {
+        if (pcie_apply_local_addr(state, bridge, "pcie-rc-tunables", config_base)) {
             printf("pcie: Error applying %s for %s\n", "pcie-rc-tunables", bridge);
             return -1;
         }
-        if (tunables_apply_local_addr(bridge, "pcie-rc-gen3-shadow-tunables", config_base)) {
+        if (pcie_apply_local_addr(state, bridge, "pcie-rc-gen3-shadow-tunables", config_base)) {
             printf("pcie: Error applying %s for %s\n", "pcie-rc-gen3-shadow-tunables", bridge);
             return -1;
         }
-        if (tunables_apply_local_addr(bridge, "pcie-rc-gen4-shadow-tunables", config_base)) {
+        if (pcie_apply_local_addr(state, bridge, "pcie-rc-gen4-shadow-tunables", config_base)) {
             printf("pcie: Error applying %s for %s\n", "pcie-rc-gen4-shadow-tunables", bridge);
             return -1;
         }

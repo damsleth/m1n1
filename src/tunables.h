@@ -25,6 +25,7 @@ int tunables_apply_global(const char *path, const char *prop);
  *
  */
 int tunables_apply_local(const char *path, const char *prop, u32 reg_idx);
+int tunables_apply_local_trace(const char *path, const char *prop, u32 reg_idx);
 
 /*
  * This functions does the same as tunables_apply_local except that it allows
@@ -36,6 +37,7 @@ int tunables_apply_local(const char *path, const char *prop, u32 reg_idx);
  *  tunables_apply_local_addr("/arm-io/dart-usb0", "dart-tunables-instance-1", 0x382f80000);
  */
 int tunables_apply_local_addr(const char *path, const char *prop, uintptr_t base);
+int tunables_apply_local_addr_trace(const char *path, const char *prop, uintptr_t base);
 
 int tunables_apply_static(void);
 
