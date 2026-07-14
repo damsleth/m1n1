@@ -26,6 +26,7 @@ int tunables_apply_global(const char *path, const char *prop);
  */
 int tunables_apply_local(const char *path, const char *prop, u32 reg_idx);
 int tunables_apply_local_trace(const char *path, const char *prop, u32 reg_idx);
+int tunables_trace_local_dry_run(const char *path, const char *prop, u32 reg_idx);
 
 /*
  * This functions does the same as tunables_apply_local except that it allows

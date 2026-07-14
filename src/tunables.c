@@ -77,14 +77,14 @@ struct tunable_local {
 } PACKED;
 
 static int tunables_apply_local_addr_internal(const char *path, const char *prop, uintptr_t base,
-                                              bool trace)
+                                              bool trace, bool write)
 {
     struct tunable_info info;
 
     if (tunables_adt_find(path, prop, &info, sizeof(struct tunable_local)) < 0)
         return -1;
 
-    if (trace) {
+    if (trace && write) {
         /*
          * T6040 can report bad fabric accesses as an imprecise asynchronous
          * L2C SError. Fence the preceding PMGR work and check for an already
@@ -94,8 +94,7 @@ static int tunables_apply_local_addr_internal(const char *path, const char *prop
         sysop("dsb sy");
         u64 l2c_err_sts = mrs(SYS_IMP_APL_L2C_ERR_STS);
         if (l2c_err_sts) {
-            printf("tunable: %s pending L2C_ERR_STS=0x%lx before first RMW\n", prop,
-                   l2c_err_sts);
+            printf("tunable: %s pending L2C_ERR_STS=0x%lx before first RMW\n", prop, l2c_err_sts);
             return -1;
         }
     }
@@ -106,50 +105,52 @@ static int tunables_apply_local_addr_internal(const char *path, const char *prop
         uintptr_t addr = base + tunable->offset;
 
         if (trace)
-            printf("tunable: %s[%d] addr=0x%lx size=%d mask=0x%lx value=0x%lx\n", prop, i,
-                   addr, tunable->size, tunable->mask, tunable->value);
+            printf("tunable: %s[%d] addr=0x%lx size=%d mask=0x%lx value=0x%lx\n", prop, i, addr,
+                   tunable->size, tunable->mask, tunable->value);
 
-        switch (tunable->size) {
-            case 1:
-                mask8(addr, tunable->mask, tunable->value);
-                break;
-            case 2:
-                mask16(addr, tunable->mask, tunable->value);
-                break;
-            case 4:
-                mask32(addr, tunable->mask, tunable->value);
-                break;
-            case 8:
-                mask64(addr, tunable->mask, tunable->value);
-                break;
-            default:
-                printf("tunable: unknown tunable size 0x%08x\n", tunable->size);
-                return -1;
+        if (write) {
+            switch (tunable->size) {
+                case 1:
+                    mask8(addr, tunable->mask, tunable->value);
+                    break;
+                case 2:
+                    mask16(addr, tunable->mask, tunable->value);
+                    break;
+                case 4:
+                    mask32(addr, tunable->mask, tunable->value);
+                    break;
+                case 8:
+                    mask64(addr, tunable->mask, tunable->value);
+                    break;
+                default:
+                    printf("tunable: unknown tunable size 0x%08x\n", tunable->size);
+                    return -1;
+            }
         }
 
-        if (trace) {
+        if (trace && write) {
             /* Force this RMW to complete before sampling the async status. */
             sysop("dsb sy");
             u64 l2c_err_sts = mrs(SYS_IMP_APL_L2C_ERR_STS);
             if (l2c_err_sts) {
-                printf("tunable: %s[%d] pending L2C_ERR_STS=0x%lx\n", prop, i,
-                       l2c_err_sts);
+                printf("tunable: %s[%d] pending L2C_ERR_STS=0x%lx\n", prop, i, l2c_err_sts);
                 return -1;
             }
-            printf("tunable: %s[%d] done\n", prop, i);
         }
+        if (trace)
+            printf("tunable: %s[%d] done\n", prop, i);
     }
     return 0;
 }
 
 int tunables_apply_local_addr(const char *path, const char *prop, uintptr_t base)
 {
-    return tunables_apply_local_addr_internal(path, prop, base, false);
+    return tunables_apply_local_addr_internal(path, prop, base, false, true);
 }
 
 int tunables_apply_local_addr_trace(const char *path, const char *prop, uintptr_t base)
 {
-    return tunables_apply_local_addr_internal(path, prop, base, true);
+    return tunables_apply_local_addr_internal(path, prop, base, true, true);
 }
 
 int tunables_apply_local(const char *path, const char *prop, u32 reg_offset)
@@ -182,4 +183,20 @@ int tunables_apply_local_trace(const char *path, const char *prop, u32 reg_offse
     }
 
     return tunables_apply_local_addr_trace(path, prop, base);
+}
+
+int tunables_trace_local_dry_run(const char *path, const char *prop, u32 reg_offset)
+{
+    struct tunable_info info;
+
+    if (tunables_adt_find(path, prop, &info, sizeof(struct tunable_local)) < 0)
+        return -1;
+
+    u64 base;
+    if (adt_get_reg(adt, info.node_path, "reg", reg_offset, &base, NULL) < 0) {
+        printf("tunable: Error getting regs\n");
+        return -1;
+    }
+
+    return tunables_apply_local_addr_internal(path, prop, base, true, false);
 }

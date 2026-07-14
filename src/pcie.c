@@ -222,8 +222,8 @@ static const struct reg_info regs_t6031 = {
  * DT reg[5] and the PCIe clock-generator accessor to DT reg[6]. Keep these indices
  * explicit: swapping them would direct the tunable writes at the wrong block.
  */
-#define APCIE_T6040_CIO3PLLCORE_IDX 5
-#define APCIE_T6040_PCIECLKGEN_IDX  6
+#define APCIE_T6040_CIO3PLLCORE_IDX    5
+#define APCIE_T6040_PCIECLKGEN_IDX     6
 #define APCIE_T6040_PHY_CLOCK_GATE_IDX 7
 
 static const struct reg_info regs_t6040 = {
@@ -445,6 +445,21 @@ static int pcie_init_controller(int controller, const char *path)
 
     if (state->pcie_regs == &regs_t6040) {
         /*
+         * Bring-up control: reproduce the exact AXI trace volume without
+         * enabling a PCIe clock gate or accessing controller MMIO. Three
+         * write-bearing traces failed after the same output line and byte
+         * count; distinguish a trace/log artifact before another MMIO test.
+         */
+        printf("pcie: T6040 AXI trace dry run; no PCIe MMIO\n");
+        if (tunables_trace_local_dry_run(path, "apcie-axi2af-tunables",
+                                         state->pcie_regs->axi_idx)) {
+            printf("pcie: Error tracing %s for %s\n", "apcie-axi2af-tunables", path);
+            return -1;
+        }
+        printf("pcie: T6040 AXI trace dry run complete; no PCIe MMIO\n");
+        return -1;
+
+        /*
          * ApplePCIEBaseT8132::_enableRootComplex() enables every clock gate
          * except the last one before applying the controller tunables. It
          * enables gate 7 (APCIE_PHY_SW on T6040) only after configuring the
@@ -464,8 +479,7 @@ static int pcie_init_controller(int controller, const char *path)
 
     if (!adt_getprop(adt, adt_offset, "apcie-axi2af-tunables", NULL)) {
         printf("pcie: No axi2af tunables\n");
-    } else if (pcie_apply_local(state, path, "apcie-axi2af-tunables",
-                                state->pcie_regs->axi_idx)) {
+    } else if (pcie_apply_local(state, path, "apcie-axi2af-tunables", state->pcie_regs->axi_idx)) {
         printf("pcie: Error applying %s for %s\n", "apcie-axi2af-tunables", path);
         return -1;
     }
@@ -476,8 +490,7 @@ static int pcie_init_controller(int controller, const char *path)
 
     if (!adt_getprop(adt, adt_offset, "apcie-common-tunables", NULL)) {
         printf("pcie: No common tunables\n");
-    } else if (pcie_apply_local(state, path, "apcie-common-tunables",
-                                state->pcie_regs->rc_idx)) {
+    } else if (pcie_apply_local(state, path, "apcie-common-tunables", state->pcie_regs->rc_idx)) {
         printf("pcie: Error applying %s for %s\n", "apcie-common-tunables", path);
         return -1;
     }
@@ -512,8 +525,7 @@ static int pcie_init_controller(int controller, const char *path)
 
     if (!adt_getprop(adt, adt_offset, "apcie-phy-tunables", NULL)) {
         printf("pcie: No PHY tunables\n");
-    } else if (pcie_apply_local(state, path, "apcie-phy-tunables",
-                                state->pcie_regs->phy_idx)) {
+    } else if (pcie_apply_local(state, path, "apcie-phy-tunables", state->pcie_regs->phy_idx)) {
         printf("pcie: Error applying %s for %s\n", "apcie-phy-tunables", path);
         return -1;
     }
@@ -733,8 +745,7 @@ static int pcie_init_controller(int controller, const char *path)
                 write32(state->port_base[port] + 0x83c, 0x0);
         }
 
-        if (pcie_apply_local_addr(state, bridge, "apcie-config-tunables",
-                                  state->port_base[port])) {
+        if (pcie_apply_local_addr(state, bridge, "apcie-config-tunables", state->port_base[port])) {
             printf("pcie: Error applying %s for %s\n", "apcie-config-tunables", bridge);
             return -1;
         }
