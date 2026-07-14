@@ -53,10 +53,13 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   `No common tunables`; a traced retry delivered an asynchronous SError after
   AXI tunable `[70]` and before `[71]`. Offline disassembly proved Apple enables
   clock gates 0–6 before AXI/CIO3/clkgen and gate 7 (`APCIE_PHY_SW`) afterward;
-  m1n1 had enabled all eight up front. Main `6efe2d45` now matches Apple's gate
+  m1n1 had enabled all eight up front. Main `6efe2d45` matches Apple's gate
   order, logs every T6040 local tunable immediately before and after its RMW,
-  and returns after the late gate but before all PHY/port writes. The corrected
-  build has not been approved for a live run. **`pcie_init` is kboot-only +
+  and returns after the late gate but before all PHY/port writes. Its approved
+  run repeated the same SError after AXI `[70]`, before CIO3/clkgen/the late
+  gate, disproving early `APCIE_PHY_SW` enable as the cause. A barrier plus
+  read-only L2C-status diagnostic is the next separately gated step.
+  **`pcie_init` is kboot-only +
   invasive: do not run it from the proxy, and do not boot this path without
   approval for that exact build.** See
   `~/Code/wallace/done/2026-07-14-t6040-wireless-pcie-map.md`.
