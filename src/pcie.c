@@ -224,6 +224,7 @@ static const struct reg_info regs_t6031 = {
  */
 #define APCIE_T6040_CIO3PLLCORE_IDX 5
 #define APCIE_T6040_PCIECLKGEN_IDX  6
+#define APCIE_T6040_PHY_CLOCK_GATE_IDX 7
 
 static const struct reg_info regs_t6040 = {
     .type = APCIE_T6031,
@@ -442,7 +443,21 @@ static int pcie_init_controller(int controller, const char *path)
     int port_reg_cnt = port_regs / state->port_count;
     printf("pcie: ADT uses %d reg entries per port\n", port_reg_cnt);
 
-    if (pmgr_adt_power_enable(path)) {
+    if (state->pcie_regs == &regs_t6040) {
+        /*
+         * ApplePCIEBaseT8132::_enableRootComplex() enables every clock gate
+         * except the last one before applying the controller tunables. It
+         * enables gate 7 (APCIE_PHY_SW on T6040) only after configuring the
+         * CIO3 PLL and PCIe clock generator. Keep the PHY switched off while
+         * AXI2AF and the clock sources are still being programmed.
+         */
+        for (u32 i = 0; i < APCIE_T6040_PHY_CLOCK_GATE_IDX; i++) {
+            if (pmgr_adt_power_enable_index(path, i)) {
+                printf("pcie: Error enabling power gate %d for %s\n", i, path);
+                return -1;
+            }
+        }
+    } else if (pmgr_adt_power_enable(path)) {
         printf("pcie: Error enabling power for %s\n", path);
         return -1;
     }
@@ -478,6 +493,13 @@ static int pcie_init_controller(int controller, const char *path)
             printf("pcie: Error applying %s for %s\n", "apcie-pcieclkgen-tunables", path);
             return -1;
         }
+
+        printf("pcie: Enabling T6040 PHY clock gate after PLL/clkgen tunables\n");
+        if (pmgr_adt_power_enable_index(path, APCIE_T6040_PHY_CLOCK_GATE_IDX)) {
+            printf("pcie: Error enabling PHY clock gate for %s\n", path);
+            return -1;
+        }
+        printf("pcie: T6040 PHY clock gate enabled\n");
 
         /* Bring-up diagnostic: do not reach PHY or port writes yet. */
         printf("pcie: T6040 clock-tunable diagnostic complete; stopping before PHY\n");
