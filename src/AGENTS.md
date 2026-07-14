@@ -58,9 +58,12 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   and returns after the late gate but before all PHY/port writes. Its approved
   run repeated the same SError after AXI `[70]`, before CIO3/clkgen/the late
   gate, disproving early `APCIE_PHY_SW` enable as the cause. A barrier plus
-  read-only L2C-status diagnostic is prepared at main `88ce1ee3`: it fences
+  read-only L2C-status diagnostic ran at main `88ce1ee3`: it fenced
   before the first and after each traced RMW, samples but never clears status,
-  and aborts on a nonzero sample. It is the next separately gated step.
+  and would abort on a nonzero sample. `[70] done` proved its immediate sample
+  was zero before the same delayed SError. All three traced logs stop at the
+  identical line and byte count; a zero-PCIe-write trace-volume control is the
+  next separately gated step.
   **`pcie_init` is kboot-only +
   invasive: do not run it from the proxy, and do not boot this path without
   approval for that exact build.** See
