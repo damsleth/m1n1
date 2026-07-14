@@ -115,8 +115,10 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   m1n1 (the sibling dockchannel-mtp block DOES map those offsets; don't
   generalize between them). The prior all-4096-AIC negative scan used MTP's RX
   BIT(3); UART RX is now believed to be BIT(1), so the dead-IRQ conclusion is
-  provisional and a bounded BIT(1) retest is prepared in Wallace. Linux keeps
-  the proven poll-mode fallback until that result is known.
+  provisional. A bounded 2026-07-14 Linux run with UART TX/RX BIT(2)/BIT(1)
+  still produced TX-only output, but could not retrieve the AIC or driver IRQ
+  count. Linux keeps the proven poll-mode fallback until a TX-only diagnostic
+  attributes the interrupt; do not publish the old scan as a hardware erratum.
 - **chickens.c — leave M4 init fns NULL** (raw-boot locks Apple sysregs; writing
   traps). `features_m4` carries the local `broken_wfi=true`.
 - **smp.c — `broken_wfi`** gates wfe-park vs `deep_wfi()`. Don't remove.
