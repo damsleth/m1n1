@@ -499,9 +499,7 @@ static int pcie_init_controller(int controller, const char *path)
         }
         printf("pcie: T6040 PHY clock gate enabled\n");
 
-        /* Bring-up diagnostic: do not reach PHY or port writes yet. */
-        printf("pcie: T6040 clock-tunable diagnostic complete; stopping before PHY\n");
-        return -1;
+        printf("pcie: T6040 clock-tunable diagnostic complete; beginning shared PHY\n");
     }
 
     /*
@@ -516,30 +514,44 @@ static int pcie_init_controller(int controller, const char *path)
     }
 
     if (state->pcie_regs->type == APCIE_T602X || state->pcie_regs->type == APCIE_T6031) {
+        if (state->pcie_regs == &regs_t6040)
+            printf("pcie: T6040 waiting for 100 MHz reference clock\n");
         if (poll32(state->phy_common_base + APCIE_PHYCMN_CLK, APCIE_PHYCMN_CLK_100MHZ,
                    APCIE_PHYCMN_CLK_100MHZ, 250000)) {
             printf("pcie: Reference clock not available\n");
             return -1;
         }
+        if (state->pcie_regs == &regs_t6040)
+            printf("pcie: T6040 100 MHz reference clock available\n");
     }
 
     for (int phy = 0; phy < state->num_phys; phy++) {
+        if (state->pcie_regs == &regs_t6040)
+            printf("pcie: T6040 PHY %d requesting CLK0\n", phy);
         set32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_CLK0REQ);
         if (poll32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_CLK0ACK,
                    APCIE_PHY_CTRL_CLK0ACK, 50000)) {
             printf("pcie: Timeout enabling PHY CLK0\n");
             return -1;
         }
+        if (state->pcie_regs == &regs_t6040)
+            printf("pcie: T6040 PHY %d CLK0 acknowledged\n", phy);
 
+        if (state->pcie_regs == &regs_t6040)
+            printf("pcie: T6040 PHY %d requesting CLK1\n", phy);
         set32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_CLK1REQ);
         if (poll32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_CLK1ACK,
                    APCIE_PHY_CTRL_CLK1ACK, 50000)) {
             printf("pcie: Timeout enabling PHY CLK1\n");
             return -1;
         }
+        if (state->pcie_regs == &regs_t6040)
+            printf("pcie: T6040 PHY %d CLK1 acknowledged\n", phy);
 
         clear32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_RESET);
         udelay(1);
+        if (state->pcie_regs == &regs_t6040)
+            printf("pcie: T6040 PHY %d reset released\n", phy);
 
         /* ??? */
         if (state->pcie_regs->type == APCIE_T81XX) {
@@ -583,6 +595,8 @@ static int pcie_init_controller(int controller, const char *path)
         if (state->pcie_regs->type == APCIE_T602X || state->pcie_regs->compat == APCIE_T8122) {
             set32(state->phy_base[phy] + 4, 0x10);
         }
+        if (state->pcie_regs == &regs_t6040)
+            printf("pcie: T6040 PHY %d IP tunables complete\n", phy);
     }
 
     if (state->pcie_regs->type == APCIE_T602X || state->pcie_regs->compat == APCIE_T8122) {
@@ -591,10 +605,14 @@ static int pcie_init_controller(int controller, const char *path)
 
         // Why always PHY 1 in this case?
         u32 off = state->num_phys > 1 ? PHY_STRIDE : 0;
+        if (state->pcie_regs == &regs_t6040)
+            printf("pcie: T6040 waiting for PHY clock enable\n");
         if (poll32(state->phy_base[0] + off + 0x8, 1, 1, 250000)) {
             printf("pcie: PHY clock enable timed out\n");
             return -1;
         }
+        if (state->pcie_regs == &regs_t6040)
+            printf("pcie: T6040 PHY clock enabled\n");
         for (int phy = 0; phy < state->num_phys; phy++) {
             if (state->pcie_regs->type == APCIE_T602X) {
                 set32(state->phy_base[phy] + APCIE_PHY_CTRL, 0x300);
@@ -608,11 +626,19 @@ static int pcie_init_controller(int controller, const char *path)
             printf("pcie: Failed to initialize RC thing\n");
             return -1;
         }
+        if (state->pcie_regs == &regs_t6040)
+            printf("pcie: T6040 RC initialization acknowledged\n");
         if (state->pcie_regs->type == APCIE_T602X) {
             if (controller == APCIE)
                 clear32(state->rc_base + 0x3c, 0x1);
             pmgr_adt_power_disable_index(path, 1);
         }
+    }
+
+    if (state->pcie_regs == &regs_t6040) {
+        /* Bring-up diagnostic: shared PHY is complete; do not reach port writes. */
+        printf("pcie: T6040 shared-PHY diagnostic complete; stopping before ports\n");
+        return -1;
     }
 
     for (u32 port = 0; port < state->port_count; port++) {
