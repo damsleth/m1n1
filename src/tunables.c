@@ -153,6 +153,61 @@ int tunables_apply_local_addr_trace(const char *path, const char *prop, uintptr_
     return tunables_apply_local_addr_internal(path, prop, base, true, true);
 }
 
+int tunables_read_first_local_addr_trace(const char *path, const char *prop, uintptr_t base)
+{
+    struct tunable_info info;
+
+    if (tunables_adt_find(path, prop, &info, sizeof(struct tunable_local)) < 0)
+        return -1;
+
+    const struct tunable_local *tunable = (const struct tunable_local *)info.tunable_raw;
+    uintptr_t addr = base + tunable->offset;
+
+    /*
+     * Bring-up diagnostic: split the first tunable RMW into a read-only run.
+     * The address, width, and property entry all come from the ADT; callers
+     * must stop before applying this or any later tunable.
+     */
+    printf("tunable: %s[0] read-only addr=0x%lx size=%d mask=0x%lx value=0x%lx\n", prop,
+           addr, tunable->size, tunable->mask, tunable->value);
+
+    sysop("dsb sy");
+    u64 l2c_err_sts = mrs(SYS_IMP_APL_L2C_ERR_STS);
+    if (l2c_err_sts) {
+        printf("tunable: %s pending L2C_ERR_STS=0x%lx before first read\n", prop, l2c_err_sts);
+        return -1;
+    }
+
+    u64 read_value;
+    switch (tunable->size) {
+        case 1:
+            read_value = read8(addr);
+            break;
+        case 2:
+            read_value = read16(addr);
+            break;
+        case 4:
+            read_value = read32(addr);
+            break;
+        case 8:
+            read_value = read64(addr);
+            break;
+        default:
+            printf("tunable: unknown tunable size 0x%08x\n", tunable->size);
+            return -1;
+    }
+
+    sysop("dsb sy");
+    l2c_err_sts = mrs(SYS_IMP_APL_L2C_ERR_STS);
+    if (l2c_err_sts) {
+        printf("tunable: %s[0] read pending L2C_ERR_STS=0x%lx\n", prop, l2c_err_sts);
+        return -1;
+    }
+
+    printf("tunable: %s[0] read value=0x%lx done\n", prop, read_value);
+    return 0;
+}
+
 int tunables_apply_local(const char *path, const char *prop, u32 reg_offset)
 {
     struct tunable_info info;

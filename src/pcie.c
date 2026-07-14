@@ -583,6 +583,16 @@ static int pcie_init_controller(int controller, const char *path)
             snprintf(auspma_prop, sizeof(auspma_prop), "apcie-phy-%d-ip-auspma-tunables", phy);
         }
 
+        if (state->pcie_regs == &regs_t6040) {
+            if (tunables_read_first_local_addr_trace(path, pll_prop,
+                                                     state->phy_ip_base[phy])) {
+                printf("pcie: Error reading first %s entry for %s\n", pll_prop, path);
+                return -1;
+            }
+            printf("pcie: T6040 op-115 read-only diagnostic complete; stopping before write\n");
+            return -1;
+        }
+
         if (pcie_apply_local_addr(state, path, pll_prop, state->phy_ip_base[phy])) {
             printf("pcie: Error applying %s for %s\n", pll_prop, path);
             return -1;
