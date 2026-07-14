@@ -75,8 +75,10 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   samples and the hard return before the first PHY write. Its approved live run
   completed all 105 operations—including CIO3, clkgen, and the late PHY clock
   gate—then booted base Linux without a nonzero L2 status or SError. The next
-  bounded diagnostic is shared PHY setup only, with a hard return before the
-  first per-port write and a fresh approval gate.
+  bounded diagnostic is prepared at main `b5ced9ba`: shared PHY setup only,
+  with a hard return before the first per-port write. Its 351-write manifest and
+  five existing read-only polls are recorded in Wallace; it requires a fresh
+  approval gate before any live run.
   **`pcie_init` is kboot-only +
   invasive: do not run it from the proxy, and do not boot this path without
   approval for that exact build.** See
