@@ -110,12 +110,13 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   power-cycle. Linux `apple_wdt` takes WD1 over once userspace pets it.
 - **dockchannel_uart.c — works on t6040 as-is** (console + proxy over the
   dockchannel FIFO; this is what DebugUSB/kisd talks to). Two hardware facts
-  discovered 2026-07-12, live-probed from m1n1: the ADT-declared AIC irq 360
-  for this FIFO **never asserts** (all 4096 AIC inputs scanned — Linux needs
-  the poll-mode patch in `~/Code/wallace/patches/`), and the block maps **only**
+  discovered 2026-07-12, live-probed from m1n1: the block maps **only**
   +0xc000 (irq, 24 B) + +0x28000..+0x38004 — reading e.g. +0x20000 async-SErrors
   m1n1 (the sibling dockchannel-mtp block DOES map those offsets; don't
-  generalize between them).
+  generalize between them). The prior all-4096-AIC negative scan used MTP's RX
+  BIT(3); UART RX is now believed to be BIT(1), so the dead-IRQ conclusion is
+  provisional and a bounded BIT(1) retest is prepared in Wallace. Linux keeps
+  the proven poll-mode fallback until that result is known.
 - **chickens.c — leave M4 init fns NULL** (raw-boot locks Apple sysregs; writing
   traps). `features_m4` carries the local `broken_wfi=true`.
 - **smp.c — `broken_wfi`** gates wfe-park vs `deep_wfi()`. Don't remove.
