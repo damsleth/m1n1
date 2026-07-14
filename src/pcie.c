@@ -478,6 +478,10 @@ static int pcie_init_controller(int controller, const char *path)
             printf("pcie: Error applying %s for %s\n", "apcie-pcieclkgen-tunables", path);
             return -1;
         }
+
+        /* Bring-up diagnostic: do not reach PHY or port writes yet. */
+        printf("pcie: T6040 clock-tunable diagnostic complete; stopping before PHY\n");
+        return -1;
     }
 
     /*
