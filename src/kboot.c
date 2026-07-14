@@ -2679,7 +2679,8 @@ int kboot_set_uboot(const char *name, const char *value)
     return i;
 }
 
-#define LOGBUF_SIZE SZ_16K
+#define LOGBUF_SIZE           SZ_16K
+#define LOGBUF_TOP_GUARD_SIZE SZ_16K
 
 struct {
     void *buffer;
@@ -2741,8 +2742,13 @@ static int dt_setup_mtd_phram(void)
             bail("FDT: failed to setup ADT MTD phram label\n");
     }
 
-    // init memory backed iodev for console log
-    logbuf.buffer = (void *)top_of_memory_alloc(LOGBUF_SIZE);
+    /*
+     * Keep the active ring away from the exclusive top-of-RAM boundary. On
+     * T6040, wrapping a ring placed in the final physical page raises a delayed
+     * L2C access-fault SError at that boundary. The unused upper page remains
+     * outside the Linux memory node along with the log allocation.
+     */
+    logbuf.buffer = (void *)top_of_memory_alloc(LOGBUF_SIZE + LOGBUF_TOP_GUARD_SIZE);
     if (!logbuf.buffer)
         bail("FDT: failed to allocate m1n1 log buffer\n");
 
