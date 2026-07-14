@@ -70,8 +70,10 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   console backlog makes it wrap during `[61] done`, with the SError delivered
   1,082 bytes later. Main `a61fd099` keeps an unused 16 KiB page above the active
   log ring and retains the zero-write trace. Its approved run completed all 77
-  entries and booted base Linux without SError, proving the guard. Restore the
-  Apple-ordered stop-before-PHY write path next under a fresh approval gate.
+  entries and booted base Linux without SError, proving the guard. Main
+  `f46d6e35` restores the Apple-ordered 105-operation path with barriers/status
+  samples and the hard return before the first PHY write. Its live run is under
+  a fresh approval gate.
   **`pcie_init` is kboot-only +
   invasive: do not run it from the proxy, and do not boot this path without
   approval for that exact build.** See
