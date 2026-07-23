@@ -492,6 +492,29 @@ static int pcie_init_controller(int controller, const char *path)
             return -1;
         }
 
+        /*
+         * T6040 PCIe-PLL bring-up (ticket 058). AppleT6040PCIe's
+         * ApplePCIEBaseT8132::_configPciePLLs() enables and locks the clkgen PLL
+         * *before* any PHY-IP access; the t8122/t6031 template this path reuses
+         * omits it, which leaves the PHY-IP (reg[3]) clock down and hangs the
+         * first PHY-IP read at 0x417040090 (op-115). Replay the exact decoded
+         * clkgen (reg[6]) sequence; offsets/values are read directly from the
+         * driver, see done/2026-07-21-t6040-pcie-op115-routefind.md.
+         */
+        u64 clkgen_base;
+        if (adt_get_reg(adt, adt_path, "reg", APCIE_T6040_PCIECLKGEN_IDX, &clkgen_base, NULL)) {
+            printf("pcie: Error getting clkgen reg for %s\n", path);
+            return -1;
+        }
+        printf("pcie: T6040 clkgen PLL enable (clkgen=0x%lx)\n", clkgen_base);
+        set32(clkgen_base + 0x4, 0x80000000);   /* PLL enable (bit 31) */
+        mask32(clkgen_base + 0x0, 0x7, 0x1);    /* low field <- 1 */
+        if (poll32(clkgen_base + 0x0, 0x80000000, 0, 250000)) { /* wait PLL lock */
+            printf("pcie: T6040 clkgen PLL did not lock\n");
+            return -1;
+        }
+        printf("pcie: T6040 clkgen PLL locked\n");
+
         printf("pcie: Enabling T6040 PHY clock gate after PLL/clkgen tunables\n");
         if (pmgr_adt_power_enable_index(path, APCIE_T6040_PHY_CLOCK_GATE_IDX)) {
             printf("pcie: Error enabling PHY clock gate for %s\n", path);
