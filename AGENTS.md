@@ -53,21 +53,21 @@ fresh build makes `build/m1n1.elf` symbols valid against the live image
 DFU port, `bash ~/Code/wallace/scripts/t6040-debugusb-console.sh [reboot]` gives the same
 proxy on a kisd pty — `M1N1DEVICE=/tmp/m1n1` — plus remote reboot, with no plain
 tether needed. It replaces m1n1's USB gadget on that port (no `/dev/cu.usbmodem*`
-while active). **Read the pty-discipline rules in `~/Code/wallace/DEVLOG.md` first** —
+while active). **Read the pty-discipline rules in `~/Code/wallace/docs/DEVLOG.md` first** —
 mis-handling the pty makes the link look dead.
 
 **Linux boot loop:** `bash ~/Code/wallace/scripts/t6040-boot-dcuart.sh` chainloads m1n1
 and boots the kernel to a two-way BusyBox shell on `/dev/ttydc0` over the same
 cable (console log + `printf 'cmd\n' > /tmp/m1n1`). Kernel builds run in the
 `kbuild` podman container via `~/Code/wallace/scripts/t6040-kbuild.sh` — recipes in
-`~/Code/wallace/DEVLOG.md`.
+`~/Code/wallace/docs/DEVLOG.md`.
 
 ## Where the knowledge lives (don't re-derive it)
 
-- `~/Code/wallace/NEXT_STEPS.md` — **the handoff doc**: what to do next, nothing else.
-- `~/Code/wallace/DEVLOG.md` — operational reference: boot/build recipes, DebugUSB link
+- `~/Code/wallace/docs/NEXT_STEPS.md` — **the handoff doc**: what to do next, nothing else.
+- `~/Code/wallace/docs/DEVLOG.md` — operational reference: boot/build recipes, DebugUSB link
   rules, solved blockers, investigation history, dead ends.
-- `~/Code/wallace/roadmap.md` — the long game (stages A–H), current snapshot.
+- `~/Code/wallace/docs/ROADMAP.md` — the long game (stages A–H), current snapshot.
 - `~/Code/wallace/done/` — finished per-topic plans, session write-ups, drafts.
 - `~/Code/wallace/scripts/` — the live harnesses (debugusb-console, boot-dcuart,
   bootcap-fb, kbuild, make-initramfs, init-dcuart).

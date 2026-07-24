@@ -9,7 +9,7 @@ Two transports; DebugUSB is the default since 2026-07-12.
 
 - **DebugUSB (kisd pty):** `bash ~/Code/wallace/scripts/t6040-debugusb-console.sh
   [reboot]` → `export M1N1DEVICE=/tmp/m1n1`. Discipline (full rules in
-  `~/Code/wallace/DEVLOG.md`): keep a `cat` reader on the pty whenever no tool is using
+  `~/Code/wallace/docs/DEVLOG.md`): keep a `cat` reader on the pty whenever no tool is using
   it (an unread pty wedges the KIS stream into a fake one-way link), never leave
   that reader attached while a proxyclient tool runs (it steals reply bytes),
   and retry once on a post-boot `UartCMDError` (console-byte desync).
