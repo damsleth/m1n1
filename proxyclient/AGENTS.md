@@ -49,6 +49,16 @@ never sweep unknown offsets. Example of how narrow the traps are: the
 dockchannel-uart block maps only +0xc000 and +0x28000..+0x38004 — reading
 +0x20000 SError'd m1n1 even though the sibling mtp block maps that offset.
 
+SPMI has a separate endpoint-scoped policy in
+`~/Code/wallace/docs/SPMI_SAFETY.md`. Never use proxyclient to scan SPMI
+controllers, SIDs, or logical registers. The only eligible target is an exact,
+approved transaction to `/arm-io/nub-spmi-a1/hpm2` after runtime verification
+of Gen3 controller `0x309198000`, sole child, compatible, SID `0x0c`, and right
+port. A nominal slave read still writes the controller command FIFO and the
+SN201202x selector, so it must appear explicitly in the ticket manifest.
+PMU/Abbey, charger, AOP-SPMI, firmware/flash, NVRAM, `RESET`, other HPMs, and
+unknown endpoints remain absolutely prohibited.
+
 ## Run code on a specific core
 
 Preferred (real elf symbol, once your build is chainloaded): `runtime = u.base +

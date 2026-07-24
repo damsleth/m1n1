@@ -4,6 +4,12 @@ Static lib linked into m1n1. Built by the top Makefile (`cargo build … --targe
 aarch64-unknown-none-softfloat`), default `make` pulls the `chainload` feature
 (fatfs, uuid).
 
+Hardware-facing Rust code inherits the root safety rules. In particular, do
+not add generic SPMI enumeration or PMU/charger/NVRAM/firmware access. The only
+current non-PMU SPMI candidate is the exact reviewed right-port HPM2 contract
+in `~/Code/wallace/docs/SPMI_SAFETY.md`; Rust code does not broaden that
+allowlist.
+
 ## Toolchain — NIGHTLY is mandatory
 
 `src/lib.rs` uses `#![feature(...)]` (cfg_version, alloc_error_handler), so a

@@ -127,6 +127,15 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
 
 ## Gotchas
 
+- **SPMI safety is endpoint- and operation-scoped.** Follow
+  `~/Code/wallace/docs/SPMI_SAFETY.md`. Never add a generic T6040 SPMI/HPM
+  walk to a live build. The only eligible endpoint is exact
+  `/arm-io/nub-spmi-a1/hpm2` (Gen3 reg0 `0x309198000`, SID `0x0c`), with
+  runtime ADT assertions and bounded FIFO/selector/command waits. PMU/Abbey,
+  charger, AOP-SPMI, firmware/flash, NVRAM, `RESET`, other HPMs, and unknown
+  endpoints remain forbidden. A Register-0 selector write used for a reviewed
+  HPM status read is allowed only within its exact ticket; it is not a general
+  write exemption.
 - After editing, `PATH="$HOME/.cargo/bin:$PATH" make -j8` (nightly rust required).
 - A freshly built `m1n1.elf` only matches the running image **after** you chainload
   that build. It's a PIE: `.text` has ~1769 R_AARCH64_RELATIVE relocs, so a raw

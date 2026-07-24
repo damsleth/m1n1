@@ -10,7 +10,15 @@ the linked docs for depth (progressive disclosure).**
 
 ## 🛑 Hard rules when the M4 is attached (a real, tethered daily-driver machine)
 
-1. **Never write SPMI / PMU / charger** registers or nodes. Never write NVRAM.
+1. **Never write PMU / charger / NVRAM / firmware or unknown SPMI
+   endpoints.** SPMI transactions are deny-by-default but may be approved for
+   an exact, ADT-verified non-PMU endpoint under
+   `~/Code/wallace/docs/SPMI_SAFETY.md`. The sole current candidate is
+   right-port `/arm-io/nub-spmi-a1/hpm2` (Gen3 controller
+   `0x309198000`, SID `0x0c`). A reviewed experiment must pin opcode/register/
+   data/bounds/fixture/recovery and address that path directly; never iterate
+   HPMs or SIDs. PMU/Abbey, charger, AOP-SPMI, NVM/flash, `RESET`, and unknown
+   endpoint writes remain absolutely prohibited.
 2. **pmgr / cluster / any MMIO write outside a known-safe path is GATED**: show the
    maintainer the exact address+value and wait. Reads of unrelated subsystems: ask.
 3. **Wrong-offset MMIO on M4 raises an async SError** that the proxy's exception
