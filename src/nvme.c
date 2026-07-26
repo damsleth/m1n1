@@ -46,6 +46,8 @@
 #define NVME_UNKNOWN_CTRL                0x24008
 #define NVME_UNKNOWN_CTRL_PRP_NULL_CHECK BIT(11)
 
+#define NVME_IOSQ_CMDS          0x1200
+#define NVME_IOCQ_CQES          0x1208
 #define NVME_MAX_PEND_CMDS_CTRL 0x1210
 #define NVME_DB_LINEAR_ASQ      0x2490c
 #define NVME_DB_LINEAR_IOSQ     0x24910
@@ -412,6 +414,9 @@ bool nvme_init(void)
         printf("nvme: create sq command failed\n");
         goto out_delete_cq;
     }
+
+    write64_lo_hi(nvme_base + NVME_IOCQ_CQES, (u64)ioq.cqes);
+    write64_lo_hi(nvme_base + NVME_IOSQ_CMDS, (u64)ioq.cmds);
 
     nvme_initialized = true;
     printf("nvme: initialized at 0x%lx\n", nvme_base);
