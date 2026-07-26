@@ -129,6 +129,7 @@ static rtkit_dev_t *nvme_rtkit = NULL;
 static sart_dev_t *nvme_sart = NULL;
 
 static u64 nvme_base;
+static u64 nvmmu_base;
 
 static struct nvme_queue adminq, ioq;
 
@@ -257,8 +258,8 @@ static bool nvme_exec_command(struct nvme_queue *q, struct nvme_command *cmd, u6
             printf("nvme: invalid tag in CQ: expected %d but got %d\n", tag, cqe.tag);
         }
 
-        write32(nvme_base + NVMMU_TCB_INVAL, cqe.tag);
-        if (read32(nvme_base + NVMMU_TCB_STAT))
+        write32(nvmmu_base + NVMMU_TCB_INVAL, cqe.tag);
+        if (read32(nvmmu_base + NVMMU_TCB_STAT))
             printf("nvme: NVMMU invalidation for tag %d failed\n", cqe.tag);
 
         /* increment head and switch phase once the end of the queue has been reached */
@@ -303,10 +304,24 @@ bool nvme_init(void)
         return NULL;
     }
 
-    if (adt_get_reg(adt, adt_path, "reg", 3, &nvme_base, NULL) < 0) {
-        printf("nvme: Error getting NVMe base address.\n");
+    u32 reg_len;
+    if (!adt_getprop(adt, node, "reg", &reg_len)) {
+        printf("nvme: Error getting reg length.\n");
         return NULL;
     }
+
+    if (adt_get_reg(adt, adt_path, "reg", 3, &nvmmu_base, NULL) < 0) {
+        printf("nvme: Error getting NVMMU base address.\n");
+        return NULL;
+    }
+    if (reg_len >= 10) {
+        if (adt_get_reg(adt, adt_path, "reg", 9, &nvme_base, NULL) < 0) {
+            printf("nvme: Error getting NVMMU base address.\n");
+            return NULL;
+        }
+    } else
+	nvme_base = nvmmu_base;
+
     u32 cg;
     if (ADT_GETPROP(adt, node, "clock-gates", &cg) < 0) {
         printf("nvme: clock-gates not set\n");
@@ -355,9 +370,9 @@ bool nvme_init(void)
     }
     write32(nvme_base + NVME_MAX_PEND_CMDS_CTRL,
             ((NVME_QUEUE_SIZE - 1) << 16) | (NVME_QUEUE_SIZE - 1));
-    write32(nvme_base + NVMMU_NUM, NVME_QUEUE_SIZE - 1);
-    write64_lo_hi(nvme_base + NVMMU_ASQ_BASE, (u64)adminq.tcbs);
-    write64_lo_hi(nvme_base + NVMMU_IOSQ_BASE, (u64)ioq.tcbs);
+    write32(nvmmu_base + NVMMU_NUM, NVME_QUEUE_SIZE - 1);
+    write64_lo_hi(nvmmu_base + NVMMU_ASQ_BASE, (u64)adminq.tcbs);
+    write64_lo_hi(nvmmu_base + NVMMU_IOSQ_BASE, (u64)ioq.tcbs);
 
     /* setup admin queue */
     if (!nvme_ctrl_disable()) {
