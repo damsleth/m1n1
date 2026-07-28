@@ -35,12 +35,13 @@
 
 /* PHY registers */
 
-#define APCIE_PHY_CTRL         0x000
-#define APCIE_PHY_CTRL_CLK0REQ BIT(0)
-#define APCIE_PHY_CTRL_CLK1REQ BIT(1)
-#define APCIE_PHY_CTRL_CLK0ACK BIT(2)
-#define APCIE_PHY_CTRL_CLK1ACK BIT(3)
-#define APCIE_PHY_CTRL_RESET   BIT(7)
+#define APCIE_PHY_CTRL             0x000
+#define APCIE_PHY_CTRL_CLK0REQ     BIT(0)
+#define APCIE_PHY_CTRL_CLK1REQ     BIT(1)
+#define APCIE_PHY_CTRL_CLK0ACK     BIT(2)
+#define APCIE_PHY_CTRL_CLK1ACK     BIT(3)
+#define APCIE_PHY_CTRL_RESET_T8103 BIT(7)
+#define APCIE_PHY_CTRL_RESET_T8132 BIT(4)
 
 #define APCIE_PHYIF_CTRL     0x024
 #define APCIE_PHYIF_CTRL_RUN BIT(0)
@@ -139,6 +140,7 @@ enum apcie_type {
     APCIE_T602X = 1,
     APCIE_T8122 = 2,
     APCIE_T6031 = 3,
+    APCIE_T8132 = 4,
 };
 
 struct reg_info {
@@ -149,6 +151,7 @@ struct reg_info {
     int rc_idx;
     int phy_common_idx;
     int phy_idx;
+    u32 phy_ctrl_reset;
     int phy_ip_idx;
     int axi_idx;
     int fuse_idx;
@@ -163,6 +166,7 @@ static const struct reg_info regs_t8xxx_t600x = {
     .rc_idx = 1,
     .phy_common_idx = -1,
     .phy_idx = 2,
+    .phy_ctrl_reset = APCIE_PHY_CTRL_RESET_T8103,
     .phy_ip_idx = 3,
     .axi_idx = 4,
     .fuse_idx = 5,
@@ -177,6 +181,7 @@ static const struct reg_info regs_t602x = {
     // 2 = phy unknown?
     .phy_common_idx = 3,
     .phy_idx = 4,
+    .phy_ctrl_reset = APCIE_PHY_CTRL_RESET_T8103,
     .phy_ip_idx = 5,
     .axi_idx = 6,
     .fuse_idx = 7,
@@ -190,6 +195,21 @@ static const struct reg_info regs_t8122 = {
     .rc_idx = 1,
     .phy_common_idx = 2,
     .phy_idx = 2,
+    .phy_ctrl_reset = APCIE_PHY_CTRL_RESET_T8103,
+    .phy_ip_idx = 3,
+    .axi_idx = 4,
+    .fuse_idx = 5,
+};
+
+static const struct reg_info regs_t8132 = {
+    .type = APCIE_T8132,
+    .compat = APCIE_T8122,
+    .shared_reg_count = 7,
+    .config_idx = 0,
+    .rc_idx = 1,
+    .phy_common_idx = 2,
+    .phy_idx = 2,
+    .phy_ctrl_reset = APCIE_PHY_CTRL_RESET_T8132,
     .phy_ip_idx = 3,
     .axi_idx = 4,
     .fuse_idx = 5,
@@ -203,37 +223,7 @@ static const struct reg_info regs_t6031 = {
     .rc_idx = 1,
     .phy_common_idx = 2,
     .phy_idx = 2,
-    .phy_ip_idx = 3,
-    .axi_idx = 4,
-};
-
-/*
- * t6040 (M4 Pro) — identical to t6031 except shared_reg_count. Verified against
- * the live /arm-io/apcie0 ADT (2026-07-10, see the PCIe plan): 35 reg entries,
- * #ports=4, shared block = reg[0..6] (config/rc/phy_common/phy_ip/axi + 2 extra
- * 0x415-block windows the base init doesn't use), then 4 ports × 7 regs. So
- * shared_reg_count must be 7 (8 → 27 port regs, which fails the even-divide check
- * at line ~386). type/compat left as t6031/T8122 so every existing t6031 code path
- * fires identically to that validated template. NOT tested at boot — pcie_init is
- * kboot-only; correctness here is ADT-derived + faithful t6031 reuse.
- *
- * The two extra shared windows are now statically resolved from the paired macOS
- * AppleT6040PCIe driver. AppleT6040PCIe::start() assigns the CIO3 PLL accessor to
- * DT reg[5] and the PCIe clock-generator accessor to DT reg[6]. Keep these indices
- * explicit: swapping them would direct the tunable writes at the wrong block.
- */
-#define APCIE_T6040_CIO3PLLCORE_IDX    5
-#define APCIE_T6040_PCIECLKGEN_IDX     6
-#define APCIE_T6040_PHY_CLOCK_GATE_IDX 7
-
-static const struct reg_info regs_t6040 = {
-    .type = APCIE_T6031,
-    .compat = APCIE_T8122,
-    .shared_reg_count = 7,
-    .config_idx = 0,
-    .rc_idx = 1,
-    .phy_common_idx = 2,
-    .phy_idx = 2,
+    .phy_ctrl_reset = APCIE_PHY_CTRL_RESET_T8103,
     .phy_ip_idx = 3,
     .axi_idx = 4,
 };
@@ -267,22 +257,6 @@ struct state {
 };
 
 static struct state controllers[NUM_CONTROLLERS];
-
-static int pcie_apply_local(const struct state *state, const char *path, const char *prop,
-                            u32 reg_idx)
-{
-    if (state->pcie_regs == &regs_t6040)
-        return tunables_apply_local_trace(path, prop, reg_idx);
-    return tunables_apply_local(path, prop, reg_idx);
-}
-
-static int pcie_apply_local_addr(const struct state *state, const char *path, const char *prop,
-                                 uintptr_t base)
-{
-    if (state->pcie_regs == &regs_t6040)
-        return tunables_apply_local_addr_trace(path, prop, base);
-    return tunables_apply_local_addr(path, prop, base);
-}
 
 static int pcie_init_controller(int controller, const char *path)
 {
@@ -330,9 +304,13 @@ static int pcie_init_controller(int controller, const char *path)
         fuse_bits = NULL;
         state->pcie_regs = &regs_t6031;
         printf("pcie: Initializing t6031 PCIe controller\n");
+    } else if (adt_is_compatible(adt, adt_offset, "apcie,t8132")) {
+        fuse_bits = NULL;
+        state->pcie_regs = &regs_t8132;
+        printf("pcie: Initializing t8132 PCIe controller\n");
     } else if (adt_is_compatible(adt, adt_offset, "apcie,t6040")) {
         fuse_bits = NULL;
-        state->pcie_regs = &regs_t6040;
+        state->pcie_regs = &regs_t8132;
         printf("pcie: Initializing t6040 PCIe controller\n");
     } else if (adt_is_compatible(adt, adt_offset, "apcie-ge,t6020")) {
         u32 lane_cfg;
@@ -443,28 +421,14 @@ static int pcie_init_controller(int controller, const char *path)
     int port_reg_cnt = port_regs / state->port_count;
     printf("pcie: ADT uses %d reg entries per port\n", port_reg_cnt);
 
-    if (state->pcie_regs == &regs_t6040) {
-        /*
-         * ApplePCIEBaseT8132::_enableRootComplex() enables every clock gate
-         * except the last one before applying the controller tunables. It
-         * enables gate 7 (APCIE_PHY_SW on T6040) only after configuring the
-         * CIO3 PLL and PCIe clock generator. Keep the PHY switched off while
-         * AXI2AF and the clock sources are still being programmed.
-         */
-        for (u32 i = 0; i < APCIE_T6040_PHY_CLOCK_GATE_IDX; i++) {
-            if (pmgr_adt_power_enable_index(path, i)) {
-                printf("pcie: Error enabling power gate %d for %s\n", i, path);
-                return -1;
-            }
-        }
-    } else if (pmgr_adt_power_enable(path)) {
+    if (pmgr_adt_power_enable(path)) {
         printf("pcie: Error enabling power for %s\n", path);
         return -1;
     }
 
     if (!adt_getprop(adt, adt_offset, "apcie-axi2af-tunables", NULL)) {
         printf("pcie: No axi2af tunables\n");
-    } else if (pcie_apply_local(state, path, "apcie-axi2af-tunables", state->pcie_regs->axi_idx)) {
+    } else if (tunables_apply_local(path, "apcie-axi2af-tunables", state->pcie_regs->axi_idx)) {
         printf("pcie: Error applying %s for %s\n", "apcie-axi2af-tunables", path);
         return -1;
     }
@@ -475,68 +439,9 @@ static int pcie_init_controller(int controller, const char *path)
 
     if (!adt_getprop(adt, adt_offset, "apcie-common-tunables", NULL)) {
         printf("pcie: No common tunables\n");
-    } else if (pcie_apply_local(state, path, "apcie-common-tunables", state->pcie_regs->rc_idx)) {
+    } else if (tunables_apply_local(path, "apcie-common-tunables", state->pcie_regs->rc_idx)) {
         printf("pcie: Error applying %s for %s\n", "apcie-common-tunables", path);
         return -1;
-    }
-
-    if (state->pcie_regs == &regs_t6040) {
-        if (pcie_apply_local(state, path, "apcie-cio3pllcore-tunables",
-                             APCIE_T6040_CIO3PLLCORE_IDX)) {
-            printf("pcie: Error applying %s for %s\n", "apcie-cio3pllcore-tunables", path);
-            return -1;
-        }
-        if (pcie_apply_local(state, path, "apcie-pcieclkgen-tunables",
-                             APCIE_T6040_PCIECLKGEN_IDX)) {
-            printf("pcie: Error applying %s for %s\n", "apcie-pcieclkgen-tunables", path);
-            return -1;
-        }
-
-        /*
-         * T6040 PCIe-PLL bring-up (ticket 058). AppleT6040PCIe's
-         * ApplePCIEBaseT8132::_configPciePLLs() enables and locks the clkgen PLL
-         * *before* any PHY-IP access; the t8122/t6031 template this path reuses
-         * omits it, which leaves the PHY-IP (reg[3]) clock down and hangs the
-         * first PHY-IP read at 0x417040090 (op-115). Replay the exact decoded
-         * clkgen (reg[6]) sequence; offsets/values are read directly from the
-         * driver, see done/2026-07-21-t6040-pcie-op115-routefind.md.
-         */
-        u64 clkgen_base;
-        if (adt_get_reg(adt, adt_path, "reg", APCIE_T6040_PCIECLKGEN_IDX, &clkgen_base, NULL)) {
-            printf("pcie: Error getting clkgen reg for %s\n", path);
-            return -1;
-        }
-        printf("pcie: T6040 clkgen PLL enable (clkgen=0x%lx)\n", clkgen_base);
-        set32(clkgen_base + 0x4, 0x80000000);   /* PLL enable (bit 31) */
-        mask32(clkgen_base + 0x0, 0x7, 0x1);    /* low field <- 1 */
-        if (poll32(clkgen_base + 0x0, 0x80000000, 0, 250000)) { /* wait PLL lock */
-            printf("pcie: T6040 clkgen PLL did not lock\n");
-            return -1;
-        }
-        printf("pcie: T6040 clkgen PLL locked\n");
-
-        /*
-         * Delta D1 (wallace 124). ApplePCIEBaseT8132::_enableRootComplex()
-         * sets clkgen[0] bit 5 immediately after _configPciePLLs() returns and
-         * strictly before the last clock gate; m1n1 went straight from the
-         * PLL-lock poll to the gate. This is the only Apple operation missing
-         * before the first PHY-IP access, so it is the leading candidate for
-         * the non-responding reg[3] aperture (the op-115 read that never
-         * returns). Evidence: read/modify/write at kernelcache
-         * 0xfffffe0009b36224-0xb36254, decoded in
-         * done/2026-07-28-t6040-initializephy-full-decode.md.
-         */
-        printf("pcie: T6040 clkgen[0] bit 5 (pre-gate, Apple _enableRootComplex)\n");
-        set32(clkgen_base + 0x0, 0x20);
-
-        printf("pcie: Enabling T6040 PHY clock gate after PLL/clkgen tunables\n");
-        if (pmgr_adt_power_enable_index(path, APCIE_T6040_PHY_CLOCK_GATE_IDX)) {
-            printf("pcie: Error enabling PHY clock gate for %s\n", path);
-            return -1;
-        }
-        printf("pcie: T6040 PHY clock gate enabled\n");
-
-        printf("pcie: T6040 clock-tunable diagnostic complete; beginning shared PHY\n");
     }
 
     /*
@@ -545,65 +450,36 @@ static int pcie_init_controller(int controller, const char *path)
 
     if (!adt_getprop(adt, adt_offset, "apcie-phy-tunables", NULL)) {
         printf("pcie: No PHY tunables\n");
-    } else if (pcie_apply_local(state, path, "apcie-phy-tunables", state->pcie_regs->phy_idx)) {
+    } else if (tunables_apply_local(path, "apcie-phy-tunables", state->pcie_regs->phy_idx)) {
         printf("pcie: Error applying %s for %s\n", "apcie-phy-tunables", path);
         return -1;
     }
 
     if (state->pcie_regs->type == APCIE_T602X || state->pcie_regs->type == APCIE_T6031) {
-        if (state->pcie_regs == &regs_t6040)
-            printf("pcie: T6040 waiting for 100 MHz reference clock\n");
         if (poll32(state->phy_common_base + APCIE_PHYCMN_CLK, APCIE_PHYCMN_CLK_100MHZ,
                    APCIE_PHYCMN_CLK_100MHZ, 250000)) {
             printf("pcie: Reference clock not available\n");
             return -1;
         }
-        if (state->pcie_regs == &regs_t6040)
-            printf("pcie: T6040 100 MHz reference clock available\n");
     }
 
     for (int phy = 0; phy < state->num_phys; phy++) {
-        if (state->pcie_regs == &regs_t6040)
-            printf("pcie: T6040 PHY %d requesting CLK0\n", phy);
         set32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_CLK0REQ);
         if (poll32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_CLK0ACK,
                    APCIE_PHY_CTRL_CLK0ACK, 50000)) {
             printf("pcie: Timeout enabling PHY CLK0\n");
             return -1;
         }
-        if (state->pcie_regs == &regs_t6040)
-            printf("pcie: T6040 PHY %d CLK0 acknowledged\n", phy);
 
-        if (state->pcie_regs == &regs_t6040) {
-            /* Delta D5: Apple's IODelay(1) between the sleep_b_sml_out ack and
-             * the CLK1 request (kernelcache 0xfffffe0009b37028). */
-            udelay(1);
-            printf("pcie: T6040 PHY %d requesting CLK1\n", phy);
-        }
         set32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_CLK1REQ);
         if (poll32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_CLK1ACK,
                    APCIE_PHY_CTRL_CLK1ACK, 50000)) {
             printf("pcie: Timeout enabling PHY CLK1\n");
             return -1;
         }
-        if (state->pcie_regs == &regs_t6040)
-            printf("pcie: T6040 PHY %d CLK1 acknowledged\n", phy);
 
-        /*
-         * Delta D2 (wallace 124). BIT(7) is a t602x-derived constant; on
-         * T8132/T6040 Apple's _initializePhy() clears BIT(4) here and never
-         * touches BIT(7) (kernelcache 0xfffffe0009b37380,
-         * `and w8, w8, #0xffffffef`, writing back the polled value so CLK0/CLK1
-         * request stay set). Both are read-modify-writes of a register m1n1
-         * already writes, so the delta is the bit number, not new surface.
-         */
-        if (state->pcie_regs == &regs_t6040)
-            clear32(state->phy_base[phy] + APCIE_PHY_CTRL, BIT(4));
-        else
-            clear32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_RESET);
+        clear32(state->phy_base[phy] + APCIE_PHY_CTRL, state->pcie_regs->phy_ctrl_reset);
         udelay(1);
-        if (state->pcie_regs == &regs_t6040)
-            printf("pcie: T6040 PHY %d bit-4 released (Apple T8132 sequence)\n", phy);
 
         /* ??? */
         if (state->pcie_regs->type == APCIE_T81XX) {
@@ -635,32 +511,11 @@ static int pcie_init_controller(int controller, const char *path)
             snprintf(auspma_prop, sizeof(auspma_prop), "apcie-phy-%d-ip-auspma-tunables", phy);
         }
 
-        if (state->pcie_regs == &regs_t6040) {
-            /*
-             * The pass/fail line for wallace ticket 124. Every earlier run hung
-             * here: the read half of the first apcie-phy-ip-pll-tunables RMW
-             * (reg[3]+0x90) never returned, i.e. the PHY-IP aperture does not
-             * respond. This build adds the two Apple operations that precede it
-             * and that m1n1 omitted (D1 clkgen[0] bit 5, D2 the bit-4 release);
-             * if the read now returns a value, that hypothesis is confirmed and
-             * the remaining deltas (D6/D7/D8) become the follow-up. The probe
-             * stays READ-ONLY and still stops before any PHY-IP write.
-             */
-            printf("pcie: T6040 PHY-IP probe with D1+D2 applied (ticket 124)\n");
-            if (tunables_read_first_local_addr_trace(path, pll_prop,
-                                                     state->phy_ip_base[phy])) {
-                printf("pcie: Error reading first %s entry for %s\n", pll_prop, path);
-                return -1;
-            }
-            printf("pcie: T6040 PHY-IP aperture RESPONDED; stopping before write\n");
-            return -1;
-        }
-
-        if (pcie_apply_local_addr(state, path, pll_prop, state->phy_ip_base[phy])) {
+        if (tunables_apply_local_addr(path, pll_prop, state->phy_ip_base[phy])) {
             printf("pcie: Error applying %s for %s\n", pll_prop, path);
             return -1;
         }
-        if (pcie_apply_local_addr(state, path, auspma_prop, state->phy_ip_base[phy])) {
+        if (tunables_apply_local_addr(path, auspma_prop, state->phy_ip_base[phy])) {
             printf("pcie: Error applying %s for %s\n", auspma_prop, path);
             return -1;
         }
@@ -668,8 +523,6 @@ static int pcie_init_controller(int controller, const char *path)
         if (state->pcie_regs->type == APCIE_T602X || state->pcie_regs->compat == APCIE_T8122) {
             set32(state->phy_base[phy] + 4, 0x10);
         }
-        if (state->pcie_regs == &regs_t6040)
-            printf("pcie: T6040 PHY %d IP tunables complete\n", phy);
     }
 
     if (state->pcie_regs->type == APCIE_T602X || state->pcie_regs->compat == APCIE_T8122) {
@@ -678,14 +531,10 @@ static int pcie_init_controller(int controller, const char *path)
 
         // Why always PHY 1 in this case?
         u32 off = state->num_phys > 1 ? PHY_STRIDE : 0;
-        if (state->pcie_regs == &regs_t6040)
-            printf("pcie: T6040 waiting for PHY clock enable\n");
         if (poll32(state->phy_base[0] + off + 0x8, 1, 1, 250000)) {
             printf("pcie: PHY clock enable timed out\n");
             return -1;
         }
-        if (state->pcie_regs == &regs_t6040)
-            printf("pcie: T6040 PHY clock enabled\n");
         for (int phy = 0; phy < state->num_phys; phy++) {
             if (state->pcie_regs->type == APCIE_T602X) {
                 set32(state->phy_base[phy] + APCIE_PHY_CTRL, 0x300);
@@ -699,19 +548,11 @@ static int pcie_init_controller(int controller, const char *path)
             printf("pcie: Failed to initialize RC thing\n");
             return -1;
         }
-        if (state->pcie_regs == &regs_t6040)
-            printf("pcie: T6040 RC initialization acknowledged\n");
         if (state->pcie_regs->type == APCIE_T602X) {
             if (controller == APCIE)
                 clear32(state->rc_base + 0x3c, 0x1);
             pmgr_adt_power_disable_index(path, 1);
         }
-    }
-
-    if (state->pcie_regs == &regs_t6040) {
-        /* Bring-up diagnostic: shared PHY is complete; do not reach port writes. */
-        printf("pcie: T6040 shared-PHY diagnostic complete; stopping before ports\n");
-        return -1;
     }
 
     for (u32 port = 0; port < state->port_count; port++) {
@@ -829,7 +670,7 @@ static int pcie_init_controller(int controller, const char *path)
                 write32(state->port_base[port] + 0x83c, 0x0);
         }
 
-        if (pcie_apply_local_addr(state, bridge, "apcie-config-tunables", state->port_base[port])) {
+        if (tunables_apply_local_addr(bridge, "apcie-config-tunables", state->port_base[port])) {
             printf("pcie: Error applying %s for %s\n", "apcie-config-tunables", bridge);
             return -1;
         }
@@ -911,15 +752,15 @@ static int pcie_init_controller(int controller, const char *path)
         /* Make Designware PCIe Core registers writable. */
         set32(config_base + DWC_DBI_RO_WR, DWC_DBI_RO_WR_EN);
 
-        if (pcie_apply_local_addr(state, bridge, "pcie-rc-tunables", config_base)) {
+        if (tunables_apply_local_addr(bridge, "pcie-rc-tunables", config_base)) {
             printf("pcie: Error applying %s for %s\n", "pcie-rc-tunables", bridge);
             return -1;
         }
-        if (pcie_apply_local_addr(state, bridge, "pcie-rc-gen3-shadow-tunables", config_base)) {
+        if (tunables_apply_local_addr(bridge, "pcie-rc-gen3-shadow-tunables", config_base)) {
             printf("pcie: Error applying %s for %s\n", "pcie-rc-gen3-shadow-tunables", bridge);
             return -1;
         }
-        if (pcie_apply_local_addr(state, bridge, "pcie-rc-gen4-shadow-tunables", config_base)) {
+        if (tunables_apply_local_addr(bridge, "pcie-rc-gen4-shadow-tunables", config_base)) {
             printf("pcie: Error applying %s for %s\n", "pcie-rc-gen4-shadow-tunables", bridge);
             return -1;
         }
@@ -1036,7 +877,7 @@ int pcie_shutdown(void)
         }
 
         for (int phy = 0; phy < state->num_phys; phy++) {
-            clear32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_RESET);
+            clear32(state->phy_base[phy] + APCIE_PHY_CTRL, state->pcie_regs->phy_ctrl_reset);
             clear32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_CLK1REQ);
             clear32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_CLK0REQ);
         }
