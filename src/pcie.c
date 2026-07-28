@@ -515,6 +515,20 @@ static int pcie_init_controller(int controller, const char *path)
         }
         printf("pcie: T6040 clkgen PLL locked\n");
 
+        /*
+         * Delta D1 (wallace 124). ApplePCIEBaseT8132::_enableRootComplex()
+         * sets clkgen[0] bit 5 immediately after _configPciePLLs() returns and
+         * strictly before the last clock gate; m1n1 went straight from the
+         * PLL-lock poll to the gate. This is the only Apple operation missing
+         * before the first PHY-IP access, so it is the leading candidate for
+         * the non-responding reg[3] aperture (the op-115 read that never
+         * returns). Evidence: read/modify/write at kernelcache
+         * 0xfffffe0009b36224-0xb36254, decoded in
+         * done/2026-07-28-t6040-initializephy-full-decode.md.
+         */
+        printf("pcie: T6040 clkgen[0] bit 5 (pre-gate, Apple _enableRootComplex)\n");
+        set32(clkgen_base + 0x0, 0x20);
+
         printf("pcie: Enabling T6040 PHY clock gate after PLL/clkgen tunables\n");
         if (pmgr_adt_power_enable_index(path, APCIE_T6040_PHY_CLOCK_GATE_IDX)) {
             printf("pcie: Error enabling PHY clock gate for %s\n", path);
@@ -560,8 +574,12 @@ static int pcie_init_controller(int controller, const char *path)
         if (state->pcie_regs == &regs_t6040)
             printf("pcie: T6040 PHY %d CLK0 acknowledged\n", phy);
 
-        if (state->pcie_regs == &regs_t6040)
+        if (state->pcie_regs == &regs_t6040) {
+            /* Delta D5: Apple's IODelay(1) between the sleep_b_sml_out ack and
+             * the CLK1 request (kernelcache 0xfffffe0009b37028). */
+            udelay(1);
             printf("pcie: T6040 PHY %d requesting CLK1\n", phy);
+        }
         set32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_CLK1REQ);
         if (poll32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_CLK1ACK,
                    APCIE_PHY_CTRL_CLK1ACK, 50000)) {
@@ -571,10 +589,21 @@ static int pcie_init_controller(int controller, const char *path)
         if (state->pcie_regs == &regs_t6040)
             printf("pcie: T6040 PHY %d CLK1 acknowledged\n", phy);
 
-        clear32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_RESET);
+        /*
+         * Delta D2 (wallace 124). BIT(7) is a t602x-derived constant; on
+         * T8132/T6040 Apple's _initializePhy() clears BIT(4) here and never
+         * touches BIT(7) (kernelcache 0xfffffe0009b37380,
+         * `and w8, w8, #0xffffffef`, writing back the polled value so CLK0/CLK1
+         * request stay set). Both are read-modify-writes of a register m1n1
+         * already writes, so the delta is the bit number, not new surface.
+         */
+        if (state->pcie_regs == &regs_t6040)
+            clear32(state->phy_base[phy] + APCIE_PHY_CTRL, BIT(4));
+        else
+            clear32(state->phy_base[phy] + APCIE_PHY_CTRL, APCIE_PHY_CTRL_RESET);
         udelay(1);
         if (state->pcie_regs == &regs_t6040)
-            printf("pcie: T6040 PHY %d reset released\n", phy);
+            printf("pcie: T6040 PHY %d bit-4 released (Apple T8132 sequence)\n", phy);
 
         /* ??? */
         if (state->pcie_regs->type == APCIE_T81XX) {
@@ -607,12 +636,23 @@ static int pcie_init_controller(int controller, const char *path)
         }
 
         if (state->pcie_regs == &regs_t6040) {
+            /*
+             * The pass/fail line for wallace ticket 124. Every earlier run hung
+             * here: the read half of the first apcie-phy-ip-pll-tunables RMW
+             * (reg[3]+0x90) never returned, i.e. the PHY-IP aperture does not
+             * respond. This build adds the two Apple operations that precede it
+             * and that m1n1 omitted (D1 clkgen[0] bit 5, D2 the bit-4 release);
+             * if the read now returns a value, that hypothesis is confirmed and
+             * the remaining deltas (D6/D7/D8) become the follow-up. The probe
+             * stays READ-ONLY and still stops before any PHY-IP write.
+             */
+            printf("pcie: T6040 PHY-IP probe with D1+D2 applied (ticket 124)\n");
             if (tunables_read_first_local_addr_trace(path, pll_prop,
                                                      state->phy_ip_base[phy])) {
                 printf("pcie: Error reading first %s entry for %s\n", pll_prop, path);
                 return -1;
             }
-            printf("pcie: T6040 op-115 read-only diagnostic complete; stopping before write\n");
+            printf("pcie: T6040 PHY-IP aperture RESPONDED; stopping before write\n");
             return -1;
         }
 
