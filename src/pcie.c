@@ -433,6 +433,46 @@ static int pcie_init_controller(int controller, const char *path)
         return -1;
     }
 
+    /*
+     * T6040 (M4 Pro) clock sources. ApplePCIEBaseT8132::_enableRootComplex()
+     * applies the CIO3/CIO4 PLL-core and PCIe clkgen tunables and runs
+     * _configPciePLLs() between axi2af and the common tunables, then sets
+     * clkgen[0] bit 5. Upstream's t8132 path does none of this and reportedly
+     * still links up on plain M4; on this M4 Pro the clkgen PLL sequence is
+     * live-proven to lock (wallace ticket 058) and bit 5 is the one remaining
+     * Apple operation before the first PHY-IP access (delta D1, kernelcache
+     * 0xfffffe0009b36224). Decode: wallace
+     * done/2026-07-28-t6040-initializephy-full-decode.md.
+     */
+    if (adt_is_compatible(adt, adt_offset, "apcie,t6040")) {
+        u64 clkgen_base;
+
+        if (adt_getprop(adt, adt_offset, "apcie-cio3pllcore-tunables", NULL) &&
+            tunables_apply_local(path, "apcie-cio3pllcore-tunables", 5)) {
+            printf("pcie: Error applying %s for %s\n", "apcie-cio3pllcore-tunables", path);
+            return -1;
+        }
+        if (adt_getprop(adt, adt_offset, "apcie-pcieclkgen-tunables", NULL) &&
+            tunables_apply_local(path, "apcie-pcieclkgen-tunables", 6)) {
+            printf("pcie: Error applying %s for %s\n", "apcie-pcieclkgen-tunables", path);
+            return -1;
+        }
+
+        if (adt_get_reg(adt, adt_path, "reg", 6, &clkgen_base, NULL)) {
+            printf("pcie: Error getting clkgen reg for %s\n", path);
+            return -1;
+        }
+        printf("pcie: T6040 clkgen PLL enable (clkgen=0x%lx)\n", clkgen_base);
+        set32(clkgen_base + 0x4, 0x80000000); /* PLL enable (bit 31) */
+        mask32(clkgen_base + 0x0, 0x7, 0x1);  /* low field <- 1 */
+        if (poll32(clkgen_base + 0x0, 0x80000000, 0, 250000)) {
+            printf("pcie: T6040 clkgen PLL did not lock\n");
+            return -1;
+        }
+        printf("pcie: T6040 clkgen PLL locked; setting clkgen[0] bit 5 (D1)\n");
+        set32(clkgen_base + 0x0, 0x20);
+    }
+
     /* ??? */
     if (controller == APCIE)
         write32(state->rc_base + 0x4, 0);
