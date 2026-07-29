@@ -316,13 +316,17 @@ bool nvme_init(void)
         printf("nvme: Error getting NVMMU base address.\n");
         return NULL;
     }
-    if (reg_len >= 10) {
+    /* adt_getprop returns the property length in BYTES; each /arm-io/ans reg
+     * entry is 2 address + 2 size cells = 16 bytes. Comparing the raw byte
+     * length against an entry count would make every machine (any reg is
+     * >= 16 bytes) take the M4 branch and fail on pre-M4 ANS nodes. */
+    if (reg_len / 16 >= 10) {
         if (adt_get_reg(adt, adt_path, "reg", 9, &nvme_base, NULL) < 0) {
-            printf("nvme: Error getting NVMMU base address.\n");
+            printf("nvme: Error getting NVMe controller base address.\n");
             return NULL;
         }
     } else
-	nvme_base = nvmmu_base;
+        nvme_base = nvmmu_base;
 
     u32 cg;
     if (ADT_GETPROP(adt, node, "clock-gates", &cg) < 0) {
@@ -366,7 +370,11 @@ bool nvme_init(void)
     }
 
     /* setup controller and NVMMU for linear submission queue */
-    if (os_firmware.version < V15_0B1) { // FIXME does this actually work with 15.0?
+    /* V_UNKNOWN means the iBoot string is NEWER than the version table (every
+     * historical version is enumerated), so treat unknown as >= 15.0 and skip.
+     * On T6040 with mBoot-18000 (macOS 26.x, "unknown") the LINEAR_SQ_CTRL
+     * write is fatal: L2C SError at reg[3]+0x24908, seen live 2026-07-25. */
+    if (os_firmware.version != V_UNKNOWN && os_firmware.version < V15_0B1) {
         set32(nvme_base + NVME_LINEAR_SQ_CTRL, NVME_LINEAR_SQ_CTRL_EN);
         clear32(nvme_base + NVME_UNKNOWN_CTRL, NVME_UNKNOWN_CTRL_PRP_NULL_CHECK);
     }
