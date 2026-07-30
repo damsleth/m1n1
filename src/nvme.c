@@ -509,8 +509,19 @@ fail:
 void nvme_shutdown(void)
 {
     if (!nvme_initialized) {
-        // nvme_ensure_shutdown();
-        return;
+        /*
+         * ANS is still running with iBoot's state (this loader never used
+         * NVMe). Linux's nvme-apple cannot adopt a live ANS: its wake path
+         * crashes the firmware and its cold-yank reset never reaches
+         * BOOT_STATUS_OK (both observed live on T6040, 2026-07-30). Our
+         * RTKit CAN adopt it (proven by the 174 probe, twice), so quiesce
+         * the proven way: full init, then fall through to the shutdown
+         * below. On init failure the init error paths have already
+         * pmgr-reset ANS, which also leaves it stopped.
+         */
+        printf("nvme: ensure-shutdown: adopting live ANS to quiesce it\n");
+        if (!nvme_init())
+            return;
     }
 
     struct nvme_command cmd;
