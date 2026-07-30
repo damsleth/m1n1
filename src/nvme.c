@@ -271,11 +271,29 @@ static bool nvme_exec_command(struct nvme_queue *q, struct nvme_command *cmd, u6
             q->cq_phase ^= 1;
         }
 
+#ifdef T6040_E2_BATCHED_DB
+        /*
+         * E2 (ticket 192): emulate Linux's BATCHED CQ doorbell. Skip the DB
+         * write on 3 of 4 completions so the 4th jumps the head by 4 --
+         * exactly what apple_nvme_poll_cq does when several CQEs are
+         * pending. If fw 26.5 asserts "CQ DB error" on the jump, single-step
+         * advancement is a firmware requirement (H2 confirmed).
+         */
+        {
+            static unsigned e2_skip = 0;
+            if (q->adminq)
+                write32(nvme_base + NVME_DB_ACQ, q->cq_head);
+            else if (++e2_skip % 4 == 0)
+                write32(nvme_base + NVME_DB_IOCQ, q->cq_head);
+        }
+        break;
+#else
         if (q->adminq)
             write32(nvme_base + NVME_DB_ACQ, q->cq_head);
         else
             write32(nvme_base + NVME_DB_IOCQ, q->cq_head);
         break;
+#endif
     }
 
     if (!found) {
