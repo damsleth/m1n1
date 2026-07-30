@@ -2,6 +2,7 @@
 
 #include "adt.h"
 #include "assert.h"
+#include "firmware.h"
 #include "malloc.h"
 #include "nvme.h"
 #include "pmgr.h"
@@ -45,6 +46,8 @@
 #define NVME_UNKNOWN_CTRL                0x24008
 #define NVME_UNKNOWN_CTRL_PRP_NULL_CHECK BIT(11)
 
+#define NVME_IOSQ_CMDS          0x1200
+#define NVME_IOCQ_CQES          0x1208
 #define NVME_MAX_PEND_CMDS_CTRL 0x1210
 #define NVME_DB_LINEAR_ASQ      0x2490c
 #define NVME_DB_LINEAR_IOSQ     0x24910
@@ -128,6 +131,7 @@ static rtkit_dev_t *nvme_rtkit = NULL;
 static sart_dev_t *nvme_sart = NULL;
 
 static u64 nvme_base;
+static u64 nvmmu_base;
 
 static struct nvme_queue adminq, ioq;
 
@@ -256,8 +260,8 @@ static bool nvme_exec_command(struct nvme_queue *q, struct nvme_command *cmd, u6
             printf("nvme: invalid tag in CQ: expected %d but got %d\n", tag, cqe.tag);
         }
 
-        write32(nvme_base + NVMMU_TCB_INVAL, cqe.tag);
-        if (read32(nvme_base + NVMMU_TCB_STAT))
+        write32(nvmmu_base + NVMMU_TCB_INVAL, cqe.tag);
+        if (read32(nvmmu_base + NVMMU_TCB_STAT))
             printf("nvme: NVMMU invalidation for tag %d failed\n", cqe.tag);
 
         /* increment head and switch phase once the end of the queue has been reached */
@@ -302,10 +306,28 @@ bool nvme_init(void)
         return NULL;
     }
 
-    if (adt_get_reg(adt, adt_path, "reg", 3, &nvme_base, NULL) < 0) {
-        printf("nvme: Error getting NVMe base address.\n");
+    u32 reg_len;
+    if (!adt_getprop(adt, node, "reg", &reg_len)) {
+        printf("nvme: Error getting reg length.\n");
         return NULL;
     }
+
+    if (adt_get_reg(adt, adt_path, "reg", 3, &nvmmu_base, NULL) < 0) {
+        printf("nvme: Error getting NVMMU base address.\n");
+        return NULL;
+    }
+    /* adt_getprop returns the property length in BYTES; each /arm-io/ans reg
+     * entry is 2 address + 2 size cells = 16 bytes. Comparing the raw byte
+     * length against an entry count would make every machine (any reg is
+     * >= 16 bytes) take the M4 branch and fail on pre-M4 ANS nodes. */
+    if (reg_len / 16 >= 10) {
+        if (adt_get_reg(adt, adt_path, "reg", 9, &nvme_base, NULL) < 0) {
+            printf("nvme: Error getting NVMe controller base address.\n");
+            return NULL;
+        }
+    } else
+        nvme_base = nvmmu_base;
+
     u32 cg;
     if (ADT_GETPROP(adt, node, "clock-gates", &cg) < 0) {
         printf("nvme: clock-gates not set\n");
@@ -348,13 +370,22 @@ bool nvme_init(void)
     }
 
     /* setup controller and NVMMU for linear submission queue */
-    set32(nvme_base + NVME_LINEAR_SQ_CTRL, NVME_LINEAR_SQ_CTRL_EN);
-    clear32(nvme_base + NVME_UNKNOWN_CTRL, NVME_UNKNOWN_CTRL_PRP_NULL_CHECK);
+    /* WALLACE-LOCAL FAIL-SAFE, not upstreamable as-is: V_UNKNOWN only means
+     * "no exact table match" and has no chronological meaning (an unlisted
+     * pre-15 build also maps to it; sol review 2026-07-30). Skipping on
+     * unknown is correct for THIS machine — mBoot-18000.121.3 is post-15 and
+     * the LINEAR_SQ_CTRL write is a fatal L2C SError at reg[3]+0x24908 (seen
+     * live 2026-07-25). Upstream should compare parsed build numbers
+     * (firmware_sfw_in_range shape) or gate on a hardware/ADT capability. */
+    if (os_firmware.version != V_UNKNOWN && os_firmware.version < V15_0B1) {
+        set32(nvme_base + NVME_LINEAR_SQ_CTRL, NVME_LINEAR_SQ_CTRL_EN);
+        clear32(nvme_base + NVME_UNKNOWN_CTRL, NVME_UNKNOWN_CTRL_PRP_NULL_CHECK);
+    }
     write32(nvme_base + NVME_MAX_PEND_CMDS_CTRL,
             ((NVME_QUEUE_SIZE - 1) << 16) | (NVME_QUEUE_SIZE - 1));
-    write32(nvme_base + NVMMU_NUM, NVME_QUEUE_SIZE - 1);
-    write64_lo_hi(nvme_base + NVMMU_ASQ_BASE, (u64)adminq.tcbs);
-    write64_lo_hi(nvme_base + NVMMU_IOSQ_BASE, (u64)ioq.tcbs);
+    write32(nvmmu_base + NVMMU_NUM, NVME_QUEUE_SIZE - 1);
+    write64_lo_hi(nvmmu_base + NVMMU_ASQ_BASE, (u64)adminq.tcbs);
+    write64_lo_hi(nvmmu_base + NVMMU_IOSQ_BASE, (u64)ioq.tcbs);
 
     /* setup admin queue */
     if (!nvme_ctrl_disable()) {
@@ -394,6 +425,9 @@ bool nvme_init(void)
         printf("nvme: create sq command failed\n");
         goto out_delete_cq;
     }
+
+    write64_lo_hi(nvme_base + NVME_IOCQ_CQES, (u64)ioq.cqes);
+    write64_lo_hi(nvme_base + NVME_IOSQ_CMDS, (u64)ioq.cmds);
 
     nvme_initialized = true;
     printf("nvme: initialized at 0x%lx\n", nvme_base);
@@ -544,7 +578,7 @@ bool nvme_read(u32 nsid, u64 lba, void *buffer)
     cmd.prp1 = (u64)buffer_addr;
     cmd.cdw10 = lba;
     cmd.cdw11 = lba >> 32;
-    cmd.cdw12 = 1; // 4096 bytes
+    cmd.cdw12 = 0; // #blocks, 0-based -> 1 block a 4096 bytes
 
     return nvme_exec_command(&ioq, &cmd, NULL);
 }
