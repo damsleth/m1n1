@@ -427,6 +427,17 @@ bool nvme_init(void)
     cmd.cdw10 = 1; // cq id
     cmd.cdw10 |= (NVME_QUEUE_SIZE - 1) << 16;
     cmd.cdw11 = NVME_QUEUE_CONTIGUOUS;
+#ifdef T6040_E9_CQ_IRQ
+    /*
+     * E9 (wallace 192): Linux creates the I/O CQ with NVME_CQ_IRQ_ENABLED
+     * and irq_vector 0; m1n1 does not. Everything else about the two
+     * setups now matches (qsize 63, NVMMU_NUM 63, contiguous, same bases),
+     * and Linux dies at its first CQ wrap while m1n1 wraps freely. Enable
+     * the interrupt here and re-run --wrap-march: if m1n1 then asserts at
+     * the wrap too, the interrupt-enabled CQ is the trigger.
+     */
+    cmd.cdw11 |= (1 << 1); /* NVME_CQ_IRQ_ENABLED */
+#endif
     if (!nvme_exec_command(&adminq, &cmd, NULL)) {
         printf("nvme: create cq command failed\n");
         goto out_disable_ctrl;
