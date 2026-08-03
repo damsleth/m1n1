@@ -216,7 +216,19 @@ static bool nvme_exec_command(struct nvme_queue *q, struct nvme_command *cmd, u6
 {
     bool found = false;
     u64 timeout;
+#ifdef T6040_E11_TAG
+    /*
+     * E11 (wallace 192): m1n1 always uses tag 0, so NVMMU TCB slot 0;
+     * Linux draws from a pool with reserved_tags = 2, so its I/O tag is
+     * NON-ZERO. After E1-E10 matched nine other properties and the fw
+     * still asserts at Linux's first CQ wrap, the TCB slot index is one
+     * of the few differences left. Use a non-zero slot here and re-run
+     * --wrap-march: an assert means the slot index is the trigger.
+     */
+    u8 tag = T6040_E11_TAG;
+#else
     u8 tag = 0;
+#endif
     struct nvme_command *queue_cmd = &q->cmds[tag];
     struct apple_nvmmu_tcb *tcb = &q->tcbs[tag];
 
