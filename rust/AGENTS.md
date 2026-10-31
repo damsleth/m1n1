@@ -7,7 +7,7 @@ aarch64-unknown-none-softfloat`), default `make` pulls the `chainload` feature
 Hardware-facing Rust code inherits the root safety rules. In particular, do
 not add generic SPMI enumeration or PMU/charger/NVRAM/firmware access. The only
 current non-PMU SPMI candidate is the exact reviewed right-port HPM2 contract
-in `~/Code/wallace/docs/SPMI_SAFETY.md`; Rust code does not broaden that
+in `~/code/wallace/docs/SPMI_SAFETY.md`; Rust code does not broaden that
 allowlist.
 
 ## Toolchain — NIGHTLY is mandatory
