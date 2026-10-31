@@ -42,7 +42,7 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   init. **Open:** TZ/carveout offset (t603x regs read 0 despite real region-id-2/4
   carveouts) — Stage-C-only, resolve via bounded value-search or macOS dump. Do NOT
   blind-sweep MCC offsets (async SError → power-cycle). See
-  `~/Code/wallace/done/2026-07-10-t6040-mcc-plan.md`.
+  `~/code/wallace/done/2026-07-10-t6040-mcc-plan.md`.
 - **pcie.c — T6040 register map DONE; live validation GATED (2026-07-14).** Added
   `regs_t6040` + `apcie,t6040`; ADT verifies 35 regs, #ports=4, shared=reg[0..6]
   then 4×7 port regs, so `shared_reg_count=7`. Static analysis of the paired
@@ -83,7 +83,7 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   **`pcie_init` is kboot-only +
   invasive: do not run it from the proxy, and do not boot this path without
   approval for that exact build.** See
-  `~/Code/wallace/done/2026-07-14-t6040-wireless-pcie-map.md`.
+  `~/code/wallace/done/2026-07-14-t6040-wireless-pcie-map.md`.
 - **kboot_atc.c / ATC-USB-DART — AUDITED 2026-07-10 (item 4).** All kboot-only +
   FDT-only (no MMIO). DART done (t6040 = `dart,t8110`, supported). ACIO USB4
   rc/pcie_adapter tunable names present on `acio0` → work as-is. **ATC PHY tunables
@@ -91,7 +91,7 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   `ATC_COMMON_CFG`, `LN{0,1}_RX_*`, …); FDT bucket names are stable but the
   per-bucket reg_offset/size (t6040 PHY reg map) must be RE'd — don't invent, don't
   add a `atc_tunables_t6040` guess. Fails gracefully to USB2-only, so it doesn't
-  block Stage C. See `~/Code/wallace/done/2026-07-10-t6040-atc-usb-dart-plan.md`.
+  block Stage C. See `~/code/wallace/done/2026-07-10-t6040-atc-usb-dart-plan.md`.
 - **kboot.c FDT (item 5) — AUDITED + display FIXED 2026-07-10.** kboot-only,
   FDT-only (safe), needs a Stage-C kernel DT to run. `dt_set_display` now handles
   t6040 (was "unknown compatible, skip"): reuses the t602x carveout scheme —
@@ -100,7 +100,7 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
   (spin-table/`dt_set_cpus`, DART t8110, ACIO) already work. **Don't** add a
   speculative `dt_fixup_t6040_compat` — wait for a real t6040 DT. dcpext data
   regions (73/74, 88/89) present but not statically carved (t602x pattern) —
-  validate at Stage C. See `~/Code/wallace/done/2026-07-10-t6040-kboot-fdt-plan.md`.
+  validate at Stage C. See `~/code/wallace/done/2026-07-10-t6040-kboot-fdt-plan.md`.
 - **dapf.c — GATED per SoC (the Stage-C handoff fix).** On t6040 ALL dapf
   entries trap (async L2C SError at kboot handoff — was the first-boot
   blocker); `dapf_skip_entry()` skips them, refined to still program dart-mtp
@@ -127,6 +127,15 @@ Bare-metal C running on the M4. Build/chainload/safety in the root `AGENTS.md`.
 
 ## Gotchas
 
+- **SPMI safety is endpoint- and operation-scoped.** Follow
+  `~/code/wallace/docs/SPMI_SAFETY.md`. Never add a generic T6040 SPMI/HPM
+  walk to a live build. The only eligible endpoint is exact
+  `/arm-io/nub-spmi-a1/hpm2` (Gen3 reg0 `0x309198000`, SID `0x0c`), with
+  runtime ADT assertions and bounded FIFO/selector/command waits. PMU/Abbey,
+  charger, AOP-SPMI, firmware/flash, NVRAM, `RESET`, other HPMs, and unknown
+  endpoints remain forbidden. A Register-0 selector write used for a reviewed
+  HPM status read is allowed only within its exact ticket; it is not a general
+  write exemption.
 - After editing, `PATH="$HOME/.cargo/bin:$PATH" make -j8` (nightly rust required).
 - A freshly built `m1n1.elf` only matches the running image **after** you chainload
   that build. It's a PIE: `.text` has ~1769 R_AARCH64_RELATIVE relocs, so a raw

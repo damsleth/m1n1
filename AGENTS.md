@@ -10,7 +10,15 @@ the linked docs for depth (progressive disclosure).**
 
 ## 🛑 Hard rules when the M4 is attached (a real, tethered daily-driver machine)
 
-1. **Never write SPMI / PMU / charger** registers or nodes. Never write NVRAM.
+1. **Never write PMU / charger / NVRAM / firmware or unknown SPMI
+   endpoints.** SPMI transactions are deny-by-default but may be approved for
+   an exact, ADT-verified non-PMU endpoint under
+   `~/code/wallace/docs/SPMI_SAFETY.md`. The sole current candidate is
+   right-port `/arm-io/nub-spmi-a1/hpm2` (Gen3 controller
+   `0x309198000`, SID `0x0c`). A reviewed experiment must pin opcode/register/
+   data/bounds/fixture/recovery and address that path directly; never iterate
+   HPMs or SIDs. PMU/Abbey, charger, AOP-SPMI, NVM/flash, `RESET`, and unknown
+   endpoint writes remain absolutely prohibited.
 2. **pmgr / cluster / any MMIO write outside a known-safe path is GATED**: show the
    maintainer the exact address+value and wait. Reads of unrelated subsystems: ask.
 3. **Wrong-offset MMIO on M4 raises an async SError** that the proxy's exception
@@ -20,7 +28,7 @@ the linked docs for depth (progressive disclosure).**
    time, ready to power-cycle. (Learned the hard way — see `src/AGENTS.md`.)
 4. **USB gadget is not hot-plug safe** — never suggest unplugging. Recovery no
    longer needs a hand on the button: `bash
-   ~/Code/wallace/scripts/t6040-debugusb-console.sh reboot` warm-reboots the M4 over the
+   ~/code/wallace/scripts/t6040-debugusb-console.sh reboot` warm-reboots the M4 over the
    DebugUSB cable and re-attaches (→ "Running proxy…" in <20 s). Reboots for the
    bring-up loop are fine; still coordinate if the machine might be in use.
 5. **Don't post anything externally** (GitHub, IRC/#asahi-dev). Draft only; the
@@ -42,29 +50,29 @@ fresh build makes `build/m1n1.elf` symbols valid against the live image
 (`runtime = u.base + elf_vaddr`).
 
 **DebugUSB transport (the default since 2026-07-12):** with a DP/TB cable in the
-DFU port, `bash ~/Code/wallace/scripts/t6040-debugusb-console.sh [reboot]` gives the same
+DFU port, `bash ~/code/wallace/scripts/t6040-debugusb-console.sh [reboot]` gives the same
 proxy on a kisd pty — `M1N1DEVICE=/tmp/m1n1` — plus remote reboot, with no plain
 tether needed. It replaces m1n1's USB gadget on that port (no `/dev/cu.usbmodem*`
-while active). **Read the pty-discipline rules in `~/Code/wallace/DEVLOG.md` first** —
+while active). **Read the pty-discipline rules in `~/code/wallace/docs/DEVLOG.md` first** —
 mis-handling the pty makes the link look dead.
 
-**Linux boot loop:** `bash ~/Code/wallace/scripts/t6040-boot-dcuart.sh` chainloads m1n1
+**Linux boot loop:** `bash ~/code/wallace/scripts/t6040-boot-dcuart.sh` chainloads m1n1
 and boots the kernel to a two-way BusyBox shell on `/dev/ttydc0` over the same
 cable (console log + `printf 'cmd\n' > /tmp/m1n1`). Kernel builds run in the
-`kbuild` podman container via `~/Code/wallace/scripts/t6040-kbuild.sh` — recipes in
-`~/Code/wallace/DEVLOG.md`.
+`kbuild` podman container via `~/code/wallace/scripts/t6040-kbuild.sh` — recipes in
+`~/code/wallace/docs/DEVLOG.md`.
 
 ## Where the knowledge lives (don't re-derive it)
 
-- `~/Code/wallace/NEXT_STEPS.md` — **the handoff doc**: what to do next, nothing else.
-- `~/Code/wallace/DEVLOG.md` — operational reference: boot/build recipes, DebugUSB link
+- `~/code/wallace/docs/NEXT_STEPS.md` — **the handoff doc**: what to do next, nothing else.
+- `~/code/wallace/docs/DEVLOG.md` — operational reference: boot/build recipes, DebugUSB link
   rules, solved blockers, investigation history, dead ends.
-- `~/Code/wallace/roadmap.md` — the long game (stages A–H), current snapshot.
-- `~/Code/wallace/done/` — finished per-topic plans, session write-ups, drafts.
-- `~/Code/wallace/scripts/` — the live harnesses (debugusb-console, boot-dcuart,
+- `~/code/wallace/docs/ROADMAP.md` — the long game (stages A–H), current snapshot.
+- `~/code/wallace/done/` — finished per-topic plans, session write-ups, drafts.
+- `~/code/wallace/scripts/` — the live harnesses (debugusb-console, boot-dcuart,
   bootcap-fb, kbuild, make-initramfs, init-dcuart).
-- `~/Code/wallace/patches/` + `~/Code/wallace/dts/` — kernel patches and the dcuart board DT the
-  kbuild container applies (copy to `~/Code/linux-build-out/` before building).
+- `~/code/wallace/patches/` + `~/code/wallace/dts/` — kernel patches and the dcuart board DT the
+  kbuild container applies (copy to `~/code/linux-build-out/` before building).
 - `proxyclient/AGENTS.md` — how to talk to the M4 (connect, run code, safe probing).
 - `src/AGENTS.md` — m1n1 firmware C: T6040 chip constants, per-driver status & gotchas.
 - Host-local agent memory (not committed): `~/.claude/projects/-Users-damsleth-Code-m1n1/memory/` — SMP topology, broken_wfi, build toolchain, DebugUSB console. Verify facts still hold before acting on them.
@@ -82,4 +90,4 @@ cable (console log + `printf 'cmd\n' > /tmp/m1n1`). Kernel builds run in the
 - `proxyclient/m1n1/proxy.py` supports pty devices (raw termios, tolerant baud
   ioctl) — required for the kisd DebugUSB bridge.
 - The curated, upstream-shaped code-only series lives on branch `t6040-bringup`
-  (worktree `~/Code/m1n1-clean`); keep it in sync with src/ changes on main.
+  (worktree `~/code/m1n1-clean`); keep it in sync with src/ changes on main.

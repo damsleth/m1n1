@@ -30,7 +30,7 @@ Environment:
 // for the data, and a high bit to encode that another byte must be consumed.
 //
 typedef uint32_t vli_type;
-#define VLI_BYTES_MAX (sizeof(vli_type) * 8 / 7)
+#define VLI_BYTES_MAX ((sizeof(vli_type) * 8 + 6) / 7)
 
 //
 // These are the possible supported types for integrity checking in an XZ file
