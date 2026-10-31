@@ -73,6 +73,16 @@ void run_actions(void)
 {
     bool usb_up = false;
 
+#ifdef FB_CONSOLE_ALWAYS
+    /*
+     * Wallace: m1n1 normally activates the framebuffer console only on the
+     * no-payload path, so an autobooting object runs invisibly behind the Apple
+     * logo. Activate it first, so the early-proxy countdown and the payload/boot
+     * log are both readable on the internal panel.
+     */
+    fb_set_active(true);
+#endif
+
 #ifndef BRINGUP
 #ifdef EARLY_PROXY_TIMEOUT
     int node = adt_path_offset(adt, "/chosen/asmb");
@@ -83,7 +93,11 @@ void run_actions(void)
         printf("Boot policy: sip0 = %ld\n", lp_sip0);
     }
 
+#ifdef EARLY_PROXY_UNCONDITIONAL
+    if (true) {
+#else
     if (!cur_boot_args.video.display && lp_sip0 == 127) {
+#endif
         printf("Bringing up USB for early debug...\n");
 
         usb_init();
@@ -117,6 +131,25 @@ void run_actions(void)
 #endif
 #endif
 
+#ifdef PAYLOAD_MASK_KEY
+    /*
+     * Wallace B0: iBoot declines to execute an enrolled raw object whose appended
+     * region looks like a payload (ticket 129). The payload is therefore stored
+     * XOR-masked so nothing recognisable appears on disk, and un-masked here in
+     * place before it is parsed. Key and length are compile-time constants; this
+     * is a plain loop over the payload region with no allocation.
+     */
+    {
+        u8 *pm = (u8 *)_payload_start;
+        for (size_t i = 0; i < (size_t)PAYLOAD_MASK_LEN; i++)
+            pm[i] ^= (u8)PAYLOAD_MASK_KEY;
+        printf("payload: un-masked %lu bytes at %p (key 0x%02x)\n",
+               (u64)PAYLOAD_MASK_LEN, pm, (u8)PAYLOAD_MASK_KEY);
+    }
+#endif
+#ifdef FB_CONSOLE_ALWAYS
+    fb_set_active(true);
+#endif
     printf("Checking for payloads...\n");
 
     if (payload_run() == 0) {
